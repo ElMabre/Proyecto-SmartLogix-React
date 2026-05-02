@@ -2,33 +2,33 @@
 import React, { useState, useCallback } from 'react';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
-import { getCollection } from '../../core/storage/mockDatabase';
+import { loginReal } from '../../core/services/authService'; // <-- Importamos el servicio real
 
 const LoginForm = ({ onLogin }) => {
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false); // Añadimos estado de carga
 
-  // useCallback memoriza la función manejadora de cambios de los inputs
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setCredentials(prev => ({ ...prev, [name]: value }));
   }, []);
 
-  // useCallback memoriza la función de envío del formulario
-  const handleSubmit = useCallback((e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     
-    // Simulamos la validación contra la base de datos del microservicio Auth
-    const users = getCollection('users');
-    const validUser = users.find(
-      u => u.email === credentials.email && u.password === credentials.password
-    );
-
-    if (validUser) {
-      onLogin(validUser);
-    } else {
-      setError('Credenciales inválidas. Usa admin@smartlogix.com / password123');
+    try {
+      // Usamos la función que se conecta a tu API Gateway real
+      const userData = await loginReal(credentials);
+      
+      // Si el backend responde bien y nos da el JWT, iniciamos sesión en React
+      onLogin(userData);
+    } catch (err) {
+      setError('Error al conectar con el servidor o credenciales inválidas.');
+    } finally {
+      setLoading(false);
     }
   }, [credentials, onLogin]);
 
@@ -69,8 +69,8 @@ const LoginForm = ({ onLogin }) => {
               />
             </div>
             <div className="pt-4 flex justify-center">
-              <Button type="submit">
-                Iniciar Sesión
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Conectando...' : 'Iniciar Sesión'}
               </Button>
             </div>
           </form>
@@ -80,5 +80,4 @@ const LoginForm = ({ onLogin }) => {
   );
 };
 
-// Memorizamos el componente completo
 export default React.memo(LoginForm);
