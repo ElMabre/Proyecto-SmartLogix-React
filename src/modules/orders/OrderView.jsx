@@ -5,12 +5,20 @@ import Button from '../../shared/components/Button';
 
 const OrderView = () => {
   const [orders, setOrders] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    productId: '',
+    quantity: 1
+  });
 
-  const fetchOrders = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
       const token = localStorage.getItem('smartlogix_jwt');
       const headers = {
@@ -21,20 +29,25 @@ const OrderView = () => {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch('http://localhost:8080/orders', {
-        method: 'GET',
-        headers: headers,
-      });
+      // Hacemos el fetch de pedidos e inventario de manera concurrente
+      const [ordersRes, productsRes] = await Promise.all([
+        fetch('http://localhost:8080/orders', { method: 'GET', headers }),
+        fetch('http://localhost:8080/products', { method: 'GET', headers })
+      ]);
       
-      if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error('No tienes autorización para ver los pedidos (403 Forbidden).');
-        }
+      if (!ordersRes.ok) {
+        if (ordersRes.status === 403) throw new Error('No tienes autorización para ver los pedidos (403 Forbidden).');
         throw new Error('Error al obtener los pedidos');
       }
+      if (!productsRes.ok) {
+        throw new Error('Error al obtener los productos para el formulario');
+      }
       
-      const data = await response.json();
-      setOrders(data);
+      const ordersData = await ordersRes.json();
+      const productsData = await productsRes.json();
+      
+      setOrders(ordersData);
+      setProducts(productsData);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -43,22 +56,38 @@ const OrderView = () => {
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetchData();
   }, []);
 
-  const handleCreateOrder = useCallback(async () => {
-    // Ajustado exactamente a lo que espera OrderRequest.java
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmitOrder = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.productId || formData.quantity < 1) {
+      setError('Por favor, selecciona un producto y una cantidad válida.');
+      return;
+    }
+
+    // Armamos el payload exactamente como lo espera el backend
     const newOrder = {
       items: [
         {
-          productId: 1, // ID de producto de prueba (asegúrate de que exista en tu DB)
-          quantity: 2   // Cantidad que estamos solicitando
+          productId: parseInt(formData.productId),
+          quantity: parseInt(formData.quantity)
         }
       ]
     };
 
     try {
       setLoading(true);
+      setError(null);
       
       const token = localStorage.getItem('smartlogix_jwt');
       const headers = {
@@ -79,13 +108,17 @@ const OrderView = () => {
         throw new Error('Error al registrar el pedido en el backend');
       }
       
+      // Limpiamos el formulario y lo ocultamos
+      setFormData({ productId: '', quantity: 1 });
+      setShowForm(false);
+      
       // Recargamos la lista desde el servidor
-      await fetchOrders();
+      await fetchData();
     } catch (err) {
       setError(err.message);
       setLoading(false);
     }
-  }, []);
+  };
 
   const ordersList = useMemo(() => {
     if (!orders || orders.length === 0) {
@@ -127,14 +160,61 @@ const OrderView = () => {
         <h1 className="text-2xl font-heading font-bold text-gray-800">
           Gestión de Pedidos
         </h1>
-        <Button onClick={handleCreateOrder} disabled={loading}>
-          {loading ? 'Procesando...' : 'Crear Pedido de Prueba'}
+        <Button onClick={() => setShowForm(!showForm)} disabled={loading}>
+          {showForm ? 'Cancelar' : 'Nuevo Pedido'}
         </Button>
       </div>
 
+      {error && <div className="p-3 bg-red-100 text-red-700 rounded font-sans text-sm">{error}</div>}
+
+      {showForm && (
+        <Card title="Crear Nuevo Pedido">
+          <form onSubmit={handleSubmitOrder} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                  Seleccionar Producto
+                </label>
+                <select
+                  name="productId"
+                  value={formData.productId}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans bg-white"
+                  required
+                >
+                  <option value="" disabled>-- Elige un producto --</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} (Stock: {p.availableQuantity})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                  Cantidad
+                </label>
+                <input
+                  type="number"
+                  name="quantity"
+                  min="1"
+                  value={formData.quantity}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans"
+                  required
+                />
+              </div>
+            </div>
+            <div className="pt-2 flex justify-end">
+              <Button type="submit" disabled={loading || !formData.productId}>
+                {loading ? 'Enviando...' : 'Confirmar Pedido'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
       <Card>
-        {error && <div className="p-3 mb-4 bg-red-100 text-red-700 rounded font-sans text-sm">{error}</div>}
-        
         {loading && orders.length === 0 ? (
           <div className="flex justify-center items-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
