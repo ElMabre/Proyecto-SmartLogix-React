@@ -2,12 +2,11 @@
 import React, { useState, useCallback } from 'react';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
-import { loginReal } from '../../core/services/authService'; // <-- Importamos el servicio real
 
 const LoginForm = ({ onLogin }) => {
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false); // Añadimos estado de carga
+  const [loading, setLoading] = useState(false);
 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
@@ -20,13 +19,27 @@ const LoginForm = ({ onLogin }) => {
     setLoading(true);
     
     try {
-      // Usamos la función que se conecta a tu API Gateway real
-      const userData = await loginReal(credentials);
+      // Hacemos el POST directo al Auth Service a través de tu API Gateway
+      // Nota: Asegúrate de que la ruta coincida con tu endpoint real (ej. /api/v1/auth/login o /auth/login)
+      const response = await fetch('http://localhost:8080/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      if (!response.ok) {
+        throw new Error('Credenciales inválidas o error de conexión con SmartLogix.');
+      }
+
+      // El backend debería devolver los datos del usuario y el Token JWT
+      const userData = await response.json();
       
-      // Si el backend responde bien y nos da el JWT, iniciamos sesión en React
+      // Pasamos los datos al nivel superior para guardar el token y cambiar la vista
       onLogin(userData);
     } catch (err) {
-      setError('Error al conectar con el servidor o credenciales inválidas.');
+      setError(err.message || 'Error al conectar con el servidor.');
     } finally {
       setLoading(false);
     }

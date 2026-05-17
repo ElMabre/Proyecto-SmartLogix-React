@@ -1,16 +1,32 @@
 // src/modules/inventory/InventoryView.jsx
-import React, { useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Card from '../../shared/components/Card';
-import { useMockApi } from '../../core/hooks/useMockApi';
 
 const InventoryView = () => {
-  // Utilizamos nuestro custom hook que ya tiene implementado useCallback internamente
-  const { data: inventory, loading, error, fetchData } = useMockApi('inventory');
+  // 1. Definimos los tres estados clave para manejar la llamada a la API
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Cargamos los datos simulados al montar el componente
+  // 2. useEffect para conectar con el API Gateway (BFF) al montar el componente
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const fetchInventory = async () => {
+      try {
+        // Asegúrate de que este endpoint coincida con las rutas expuestas por tu API Gateway
+        const response = await fetch('http://localhost:8080/api/v1/inventory');
+        if (!response.ok) throw new Error('Error al obtener el inventario de SmartLogix');
+        
+        const data = await response.json();
+        setInventory(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInventory();
+  }, []); // El arreglo vacío asegura que la petición se hace solo una vez al cargar la vista
 
   // Memorizamos el renderizado de las filas de la tabla para optimizar el rendimiento
   // Esto evita procesar el map() de nuevo si el estado 'inventory' no ha cambiado

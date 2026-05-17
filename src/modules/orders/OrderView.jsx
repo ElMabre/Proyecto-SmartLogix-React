@@ -1,27 +1,64 @@
 // src/modules/orders/OrderView.jsx
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
-import { useMockApi } from '../../core/hooks/useMockApi';
 
 const OrderView = () => {
-  const { data: orders, loading, error, fetchData, createData } = useMockApi('orders');
+  // 1. Definimos los tres estados clave
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Cargar pedidos al montar el componente
+  // Función encapsulada para obtener los pedidos, así podemos reutilizarla
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:8080/api/v1/orders');
+      if (!response.ok) throw new Error('Error al obtener los pedidos');
+      
+      const data = await response.json();
+      setOrders(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2. Cargar pedidos al montar el componente
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchOrders();
+  }, []); // Dependencias vacías para que se ejecute solo al montar
 
-  // Memorizamos la función de creación para no re-instanciarla en cada render
-  const handleCreateMockOrder = useCallback(async () => {
+  // 3. Modificamos la creación para que haga un POST real al Gateway
+  const handleCreateOrder = useCallback(async () => {
     const newOrder = {
+      // Nota: Asegúrate de que estos campos coincidan con tu OrderRequest de Spring Boot
       customer: 'Cliente de Prueba PYME',
       total: 15500,
       status: 'Procesando',
-      date: new Date().toISOString().split('T')[0], // Fecha en formato YYYY-MM-DD
+      date: new Date().toISOString().split('T')[0],
     };
-    await createData(newOrder);
-  }, [createData]);
+
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:8080/api/v1/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newOrder),
+      });
+
+      if (!response.ok) throw new Error('Error al registrar el pedido en el backend');
+      
+      // Si se crea correctamente, recargamos la lista desde el servidor
+      await fetchOrders();
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  }, []);
 
   // Memorizamos el renderizado de la lista de pedidos
   const ordersList = useMemo(() => {
@@ -64,8 +101,8 @@ const OrderView = () => {
         <h1 className="text-2xl font-heading font-bold text-gray-800">
           Gestión de Pedidos
         </h1>
-        <Button onClick={handleCreateMockOrder} disabled={loading}>
-          {loading ? 'Creando...' : 'Crear Pedido de Prueba'}
+        <Button onClick={handleCreateOrder} disabled={loading}>
+          {loading ? 'Procesando...' : 'Crear Pedido de Prueba'}
         </Button>
       </div>
 
