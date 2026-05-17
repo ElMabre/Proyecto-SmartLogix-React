@@ -20,7 +20,6 @@ const InventoryView = () => {
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        // Apuntamos directamente a /products como exige el Gateway ahora
         const response = await fetch('http://localhost:8080/products', {
           method: 'GET',
           headers: headers,
@@ -56,21 +55,28 @@ const InventoryView = () => {
       );
     }
 
-    return inventory.map((product) => (
-      <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-        <td className="px-4 py-3 font-sans text-sm text-gray-600">{product.sku}</td>
-        <td className="px-4 py-3 font-sans text-sm text-gray-800 font-medium">{product.name}</td>
-        <td className="px-4 py-3 font-sans text-sm text-gray-600 text-right">{product.stock} und.</td>
-        <td className="px-4 py-3 font-sans text-sm text-gray-600 text-right">
-          ${product.price.toLocaleString('es-CL')}
-        </td>
-        <td className="px-4 py-3 font-sans text-sm text-center">
-          <span className={`px-2 py-1 rounded text-xs font-medium ${product.stock > 50 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-            {product.stock > 50 ? 'Óptimo' : 'Bajo Stock'}
-          </span>
-        </td>
-      </tr>
-    ));
+    return inventory.map((product) => {
+      // Extraemos los datos reales que envía Spring Boot y damos valores por defecto por seguridad
+      const stock = product.availableQuantity || 0;
+      const price = product.price || 0;
+      const sku = product.sku || `PRD-${product.id}`;
+
+      return (
+        <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+          <td className="px-4 py-3 font-sans text-sm text-gray-600">{sku}</td>
+          <td className="px-4 py-3 font-sans text-sm text-gray-800 font-medium">{product.name}</td>
+          <td className="px-4 py-3 font-sans text-sm text-gray-600 text-right">{stock} und.</td>
+          <td className="px-4 py-3 font-sans text-sm text-gray-600 text-right">
+            ${price.toLocaleString('es-CL')}
+          </td>
+          <td className="px-4 py-3 font-sans text-sm text-center">
+            <span className={`px-2 py-1 rounded text-xs font-medium ${stock > 50 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+              {stock > 50 ? 'Óptimo' : 'Bajo Stock'}
+            </span>
+          </td>
+        </tr>
+      );
+    });
   }, [inventory]);
 
   return (
