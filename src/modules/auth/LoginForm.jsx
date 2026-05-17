@@ -20,7 +20,6 @@ const LoginForm = ({ onLogin }) => {
     
     try {
       // Hacemos el POST directo al Auth Service a través de tu API Gateway
-      // Nota: Asegúrate de que la ruta coincida con tu endpoint real (ej. /api/v1/auth/login o /auth/login)
       const response = await fetch('http://localhost:8080/auth/login', {
         method: 'POST',
         headers: {
@@ -36,7 +35,12 @@ const LoginForm = ({ onLogin }) => {
       // El backend debería devolver los datos del usuario y el Token JWT
       const userData = await response.json();
       
-      // Pasamos los datos al nivel superior para guardar el token y cambiar la vista
+      // Guardamos el JWT en el localStorage para usarlo en futuras peticiones
+      if (userData && userData.token) {
+        localStorage.setItem('smartlogix_jwt', userData.token);
+      }
+      
+      // Pasamos los datos al nivel superior para cambiar la vista
       onLogin(userData);
     } catch (err) {
       setError(err.message || 'Error al conectar con el servidor.');

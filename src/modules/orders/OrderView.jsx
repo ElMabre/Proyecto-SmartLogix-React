@@ -4,17 +4,34 @@ import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
 
 const OrderView = () => {
-  // 1. Definimos los tres estados clave
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Función encapsulada para obtener los pedidos, así podemos reutilizarla
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8080/api/v1/orders');
-      if (!response.ok) throw new Error('Error al obtener los pedidos');
+      
+      const token = localStorage.getItem('smartlogix_jwt');
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('http://localhost:8080/orders', {
+        method: 'GET',
+        headers: headers,
+      });
+      
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error('No tienes autorización para ver los pedidos (403 Forbidden).');
+        }
+        throw new Error('Error al obtener los pedidos');
+      }
       
       const data = await response.json();
       setOrders(data);
@@ -25,34 +42,44 @@ const OrderView = () => {
     }
   };
 
-  // 2. Cargar pedidos al montar el componente
   useEffect(() => {
     fetchOrders();
-  }, []); // Dependencias vacías para que se ejecute solo al montar
+  }, []);
 
-  // 3. Modificamos la creación para que haga un POST real al Gateway
   const handleCreateOrder = useCallback(async () => {
+    // Ajustado exactamente a lo que espera OrderRequest.java
     const newOrder = {
-      // Nota: Asegúrate de que estos campos coincidan con tu OrderRequest de Spring Boot
-      customer: 'Cliente de Prueba PYME',
-      total: 15500,
-      status: 'Procesando',
-      date: new Date().toISOString().split('T')[0],
+      items: [
+        {
+          productId: 1, // ID de producto de prueba (asegúrate de que exista en tu DB)
+          quantity: 2   // Cantidad que estamos solicitando
+        }
+      ]
     };
 
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8080/api/v1/orders', {
+      
+      const token = localStorage.getItem('smartlogix_jwt');
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('http://localhost:8080/orders', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify(newOrder),
       });
 
-      if (!response.ok) throw new Error('Error al registrar el pedido en el backend');
+      if (!response.ok) {
+        throw new Error('Error al registrar el pedido en el backend');
+      }
       
-      // Si se crea correctamente, recargamos la lista desde el servidor
+      // Recargamos la lista desde el servidor
       await fetchOrders();
     } catch (err) {
       setError(err.message);
@@ -60,7 +87,6 @@ const OrderView = () => {
     }
   }, []);
 
-  // Memorizamos el renderizado de la lista de pedidos
   const ordersList = useMemo(() => {
     if (!orders || orders.length === 0) {
       return (
@@ -75,20 +101,20 @@ const OrderView = () => {
         {orders.map((order) => (
           <div key={order.id} className="border border-gray-200 rounded p-4 shadow-sm hover:shadow-md transition-shadow bg-white">
             <div className="flex justify-between mb-2">
-              <span className="font-heading font-semibold text-gray-800">#{order.id}</span>
-              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-medium font-sans">
+              <span className="font-heading font-semibold text-gray-800">Pedido #{order.id}</span>
+              <span className={`text-xs px-2 py-1 rounded font-medium font-sans ${order.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' : order.status === 'CANCELLED_NO_STOCK' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
                 {order.status}
               </span>
             </div>
             <p className="text-sm text-gray-600 font-sans mb-1">
-              <span className="font-medium">Cliente:</span> {order.customer}
+              <span className="font-medium">Usuario ID:</span> {order.userId || 'N/A'}
             </p>
             <p className="text-sm text-gray-600 font-sans mb-1">
-              <span className="font-medium">Fecha:</span> {order.date}
+              <span className="font-medium">Fecha:</span> {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
             </p>
-            <p className="text-lg font-heading font-bold text-gray-900 mt-2">
-              ${order.total.toLocaleString('es-CL')}
-            </p>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <span className="text-xs text-gray-500 font-medium">Artículos: {order.items ? order.items.length : 0}</span>
+            </div>
           </div>
         ))}
       </div>

@@ -3,18 +3,35 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Card from '../../shared/components/Card';
 
 const InventoryView = () => {
-  // 1. Definimos los tres estados clave para manejar la llamada a la API
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 2. useEffect para conectar con el API Gateway (BFF) al montar el componente
   useEffect(() => {
     const fetchInventory = async () => {
       try {
-        // Asegúrate de que este endpoint coincida con las rutas expuestas por tu API Gateway
-        const response = await fetch('http://localhost:8080/api/v1/inventory');
-        if (!response.ok) throw new Error('Error al obtener el inventario de SmartLogix');
+        const token = localStorage.getItem('smartlogix_jwt');
+        
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Apuntamos directamente a /products como exige el Gateway ahora
+        const response = await fetch('http://localhost:8080/products', {
+          method: 'GET',
+          headers: headers,
+        });
+
+        if (!response.ok) {
+          if (response.status === 403) {
+            throw new Error('No tienes autorización para acceder al inventario (403 Forbidden).');
+          }
+          throw new Error('Error al obtener el inventario de SmartLogix');
+        }
         
         const data = await response.json();
         setInventory(data);
@@ -26,10 +43,8 @@ const InventoryView = () => {
     };
 
     fetchInventory();
-  }, []); // El arreglo vacío asegura que la petición se hace solo una vez al cargar la vista
+  }, []); 
 
-  // Memorizamos el renderizado de las filas de la tabla para optimizar el rendimiento
-  // Esto evita procesar el map() de nuevo si el estado 'inventory' no ha cambiado
   const tableRows = useMemo(() => {
     if (!inventory || inventory.length === 0) {
       return (
@@ -46,7 +61,6 @@ const InventoryView = () => {
         <td className="px-4 py-3 font-sans text-sm text-gray-600">{product.sku}</td>
         <td className="px-4 py-3 font-sans text-sm text-gray-800 font-medium">{product.name}</td>
         <td className="px-4 py-3 font-sans text-sm text-gray-600 text-right">{product.stock} und.</td>
-        {/* Formateamos el precio como CLP (Pesos Chilenos) */}
         <td className="px-4 py-3 font-sans text-sm text-gray-600 text-right">
           ${product.price.toLocaleString('es-CL')}
         </td>
@@ -97,5 +111,4 @@ const InventoryView = () => {
   );
 };
 
-// Exportamos envuelto en React.memo
 export default React.memo(InventoryView);
