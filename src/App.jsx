@@ -5,6 +5,8 @@ import DashboardLayout from './shared/layouts/DashboardLayout';
 import LoginForm from './modules/auth/LoginForm';
 import InventoryView from './modules/inventory/InventoryView';
 import OrderView from './modules/orders/OrderView';
+// Importamos la nueva vista de gestión de usuarios
+import UserManagementView from './modules/users/UserManagementView'; 
 
 const App = () => {
   // Estado global para manejar la sesión y la navegación
@@ -38,10 +40,13 @@ const App = () => {
   }
 
   // Si hay usuario, renderizamos el Layout principal inyectando el Bounded Context correspondiente
+  // Agregamos la propiedad userRole pasándole el rol del usuario actual
   return (
-    <DashboardLayout onNavigate={handleNavigate} currentPath={currentPath}>
+    <DashboardLayout onNavigate={handleNavigate} currentPath={currentPath} userRole={user?.role}>
       {currentPath === 'inventory' && <InventoryView />}
       {currentPath === 'orders' && <OrderView />}
+      {/* Renderizamos la vista de usuarios solo si el path coincide y el usuario es ADMIN */}
+      {currentPath === 'users' && user?.role === 'ADMIN' && <UserManagementView />}
     </DashboardLayout>
   );
 };

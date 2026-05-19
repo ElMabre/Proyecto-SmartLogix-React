@@ -1,11 +1,13 @@
 // src/shared/layouts/DashboardLayout.jsx
 import React from 'react';
 
-const DashboardLayout = ({ children, onNavigate, currentPath }) => {
+const DashboardLayout = ({ children, onNavigate, currentPath, userRole }) => {
   // Opciones del menú basadas en los Bounded Contexts de SmartLogix
+  // Se agrega condicionalmente la pestaña de usuarios si el rol es ADMIN
   const menuItems = [
     { id: 'inventory', label: 'Inventario' },
     { id: 'orders', label: 'Pedidos' },
+    ...(userRole === 'ADMIN' ? [{ id: 'users', label: 'Gestión de Usuarios' }] : []),
     { id: 'auth', label: 'Cerrar Sesión' }
   ];
 

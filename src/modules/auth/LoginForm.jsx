@@ -32,15 +32,18 @@ const LoginForm = ({ onLogin }) => {
         throw new Error('Credenciales inválidas o error de conexión con SmartLogix.');
       }
 
-      // El backend debería devolver los datos del usuario y el Token JWT
+      // El backend devuelve los datos de LoginResponse.java
       const userData = await response.json();
       
-      // Guardamos el JWT en el localStorage para usarlo en futuras peticiones
+      // Guardamos el JWT y los datos clave en el localStorage para usar en el resto de la app
       if (userData && userData.token) {
         localStorage.setItem('smartlogix_jwt', userData.token);
+        localStorage.setItem('smartlogix_pyme_id', userData.pymeId); // Guardamos la PYME
+        localStorage.setItem('smartlogix_role', userData.role);      // Guardamos el ROL
+        localStorage.setItem('smartlogix_user_id', userData.userId); // Guardamos el ID del usuario
       }
       
-      // Pasamos los datos al nivel superior para cambiar la vista
+      // Pasamos los datos al nivel superior para cambiar la vista (App.jsx)
       onLogin(userData);
     } catch (err) {
       setError(err.message || 'Error al conectar con el servidor.');

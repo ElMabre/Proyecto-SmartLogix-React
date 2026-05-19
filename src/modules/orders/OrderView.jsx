@@ -3,9 +3,29 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
 
-// Precio simulado para el cálculo comercial (hasta que lo agreguemos al microservicio de inventario)
+// Precio simulado para el cálculo comercial
 const MOCK_PRICE = 15000; 
 const IVA_RATE = 0.19; // 19% IVA Chileno
+
+// Diccionario para traducir estados al español
+const statusTranslations = {
+  'CONFIRMED': 'Confirmado',
+  'PENDING': 'Pendiente',
+  'CANCELLED_NO_STOCK': 'Cancelado (Sin Stock)',
+  'SHIPPED': 'Enviado',
+  'DELIVERED': 'Entregado'
+};
+
+const getStatusColor = (status) => {
+  switch(status) {
+    case 'CONFIRMED': return 'bg-green-100 text-green-800';
+    case 'CANCELLED_NO_STOCK': return 'bg-red-100 text-red-800';
+    case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+    case 'SHIPPED': return 'bg-purple-100 text-purple-800';
+    case 'DELIVERED': return 'bg-blue-100 text-blue-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+};
 
 const OrderView = () => {
   const [orders, setOrders] = useState([]);
@@ -17,6 +37,7 @@ const OrderView = () => {
   // Estado para el modal de detalles
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [statusUpdateLoading, setStatusUpdateLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     productId: '',
@@ -81,7 +102,6 @@ const OrderView = () => {
       return;
     }
 
-    // Cálculos financieros comerciales
     const subtotal = MOCK_PRICE * parseInt(formData.quantity);
     const iva = subtotal * IVA_RATE;
     const totalAmount = subtotal + iva;
@@ -140,6 +160,35 @@ const OrderView = () => {
     }
   };
 
+  // Función para cambiar estado del pedido
+  const handleStatusChange = async (orderId, newStatus) => {
+    try {
+      setStatusUpdateLoading(true);
+      const token = localStorage.getItem('smartlogix_jwt');
+      
+      const response = await fetch(`http://localhost:8080/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) throw new Error('Error al actualizar el estado en el servidor');
+      
+      // Actualizamos localmente y recargamos para asegurar sincronización
+      await fetchData();
+      
+      // Actualizamos la orden seleccionada en el modal para que refleje el cambio instantáneamente
+      setSelectedOrder(prev => ({...prev, status: newStatus}));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setStatusUpdateLoading(false);
+    }
+  };
+
   const openDetailsModal = (order) => {
     setSelectedOrder(order);
     setIsModalOpen(true);
@@ -165,8 +214,8 @@ const OrderView = () => {
           <div key={order.id} className="border border-gray-200 rounded p-4 shadow-sm hover:shadow-md transition-shadow bg-white flex flex-col">
             <div className="flex justify-between mb-2">
               <span className="font-heading font-semibold text-gray-800">Pedido #{order.id}</span>
-              <span className={`text-xs px-2 py-1 rounded font-medium font-sans ${order.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' : order.status === 'CANCELLED_NO_STOCK' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
-                {order.status}
+              <span className={`text-xs px-2 py-1 rounded font-medium font-sans ${getStatusColor(order.status)}`}>
+                {statusTranslations[order.status] || order.status}
               </span>
             </div>
             <p className="text-sm text-gray-600 font-sans mb-1 truncate">
@@ -184,7 +233,7 @@ const OrderView = () => {
                 onClick={() => openDetailsModal(order)}
                 className="w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
               >
-                Ver Detalles Completos
+                Ver Detalles / Gestionar Estado
               </button>
             </div>
           </div>
@@ -209,99 +258,39 @@ const OrderView = () => {
       {showForm && (
         <Card title="Crear Nuevo Pedido Logístico">
           <form onSubmit={handleSubmitOrder} className="space-y-4">
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-100 pb-4">
+              {/* Resto del formulario igual que antes... */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
-                  Nombre del Cliente
-                </label>
-                <input
-                  type="text"
-                  name="customerName"
-                  value={formData.customerName}
-                  onChange={handleInputChange}
-                  placeholder="Ej. Juan Pérez"
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans"
-                  required
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Nombre del Cliente</label>
+                <input type="text" name="customerName" value={formData.customerName} onChange={handleInputChange} placeholder="Ej. Juan Pérez" className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans" required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
-                  RUT del Cliente
-                </label>
-                <input
-                  type="text"
-                  name="customerRut"
-                  value={formData.customerRut}
-                  onChange={handleInputChange}
-                  placeholder="Ej. 12.345.678-9"
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans"
-                  required
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">RUT del Cliente</label>
+                <input type="text" name="customerRut" value={formData.customerRut} onChange={handleInputChange} placeholder="Ej. 12.345.678-9" className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans" required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
-                  Correo Electrónico
-                </label>
-                <input
-                  type="email"
-                  name="customerEmail"
-                  value={formData.customerEmail}
-                  onChange={handleInputChange}
-                  placeholder="juan@ejemplo.com"
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans"
-                  required
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Correo Electrónico</label>
+                <input type="email" name="customerEmail" value={formData.customerEmail} onChange={handleInputChange} placeholder="juan@ejemplo.com" className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans" required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
-                  Dirección de Despacho
-                </label>
-                <input
-                  type="text"
-                  name="shippingAddress"
-                  value={formData.shippingAddress}
-                  onChange={handleInputChange}
-                  placeholder="Av. Providencia 123, Santiago"
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans"
-                  required
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Dirección de Despacho</label>
+                <input type="text" name="shippingAddress" value={formData.shippingAddress} onChange={handleInputChange} placeholder="Av. Providencia 123, Santiago" className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans" required />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
-                  Seleccionar Producto
-                </label>
-                <select
-                  name="productId"
-                  value={formData.productId}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans bg-white"
-                  required
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Seleccionar Producto</label>
+                <select name="productId" value={formData.productId} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans bg-white" required>
                   <option value="" disabled>-- Elige un producto --</option>
                   {products.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} (Stock: {p.availableQuantity})
-                    </option>
+                    <option key={p.id} value={p.id}>{p.name} (Stock: {p.availableQuantity})</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
-                  Cantidad
-                </label>
-                <input
-                  type="number"
-                  name="quantity"
-                  min="1"
-                  value={formData.quantity}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans"
-                  required
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Cantidad</label>
+                <input type="number" name="quantity" min="1" value={formData.quantity} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans" required />
               </div>
             </div>
             
@@ -344,6 +333,26 @@ const OrderView = () => {
             
             <div className="p-4 space-y-4 font-sans">
               
+              {/* Sección Cambio de Estado */}
+              <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                <h4 className="text-xs uppercase tracking-wider text-blue-800 font-semibold mb-2">Gestionar Estado</h4>
+                <div className="flex items-center gap-3">
+                  <select 
+                    className="p-2 border border-gray-300 rounded w-full text-sm font-sans focus:ring-blue-500 outline-none disabled:bg-gray-100"
+                    value={selectedOrder.status}
+                    onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
+                    disabled={statusUpdateLoading}
+                  >
+                    <option value="PENDING">Pendiente</option>
+                    <option value="CONFIRMED">Confirmado</option>
+                    <option value="SHIPPED">Enviado</option>
+                    <option value="DELIVERED">Entregado</option>
+                    <option value="CANCELLED_NO_STOCK">Cancelado (Sin Stock)</option>
+                  </select>
+                  {statusUpdateLoading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>}
+                </div>
+              </div>
+
               {/* Sección Cliente */}
               <div>
                 <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">Datos del Cliente</h4>
@@ -363,7 +372,7 @@ const OrderView = () => {
                     {selectedOrder.items && selectedOrder.items.length > 0 ? (
                       selectedOrder.items.map((item, idx) => (
                          <li key={idx} className="py-2 flex justify-between">
-                            <span>Producto ID {item.productId} <span className="text-gray-500">x{item.quantity}</span></span>
+                            <span>Producto ID {item.productId} <span className="text-gray-500 font-semibold">x{item.quantity}</span></span>
                          </li>
                       ))
                     ) : (
@@ -395,7 +404,7 @@ const OrderView = () => {
             </div>
             
             <div className="border-t p-4 flex justify-end">
-              <Button onClick={() => setIsModalOpen(false)}>Cerrar</Button>
+              <Button onClick={() => setIsModalOpen(false)}>Cerrar Panel</Button>
             </div>
           </div>
         </div>
