@@ -1,13 +1,11 @@
-// src/modules/auth/LoginForm.jsx
 import React, { useState, useCallback } from 'react';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
-import { loginReal } from '../../core/services/authService'; // <-- Importamos el servicio real
 
 const LoginForm = ({ onLogin }) => {
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false); // Añadimos estado de carga
+  const [loading, setLoading] = useState(false);
 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
@@ -20,13 +18,28 @@ const LoginForm = ({ onLogin }) => {
     setLoading(true);
     
     try {
-      // Usamos la función que se conecta a tu API Gateway real
-      const userData = await loginReal(credentials);
+      const response = await fetch('http://localhost:8080/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      if (!response.ok) {
+        throw new Error('Credenciales inválidas o error de conexión con SmartLogix.');
+      }
+      const userData = await response.json();
       
-      // Si el backend responde bien y nos da el JWT, iniciamos sesión en React
+      if (userData && userData.token) {
+        localStorage.setItem('smartlogix_jwt', userData.token);
+        localStorage.setItem('smartlogix_pyme_id', userData.pymeId); 
+        localStorage.setItem('smartlogix_role', userData.role);      
+        localStorage.setItem('smartlogix_user_id', userData.userId); 
+      }
       onLogin(userData);
     } catch (err) {
-      setError('Error al conectar con el servidor o credenciales inválidas.');
+      setError(err.message || 'Error al conectar con el servidor.');
     } finally {
       setLoading(false);
     }

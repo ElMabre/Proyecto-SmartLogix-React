@@ -1,11 +1,10 @@
-// src/shared/layouts/DashboardLayout.jsx
 import React from 'react';
 
-const DashboardLayout = ({ children, onNavigate, currentPath }) => {
-  // Opciones del menú basadas en los Bounded Contexts de SmartLogix
+const DashboardLayout = ({ children, onNavigate, currentPath, userRole }) => {
   const menuItems = [
     { id: 'inventory', label: 'Inventario' },
     { id: 'orders', label: 'Pedidos' },
+    ...(userRole === 'ADMIN' ? [{ id: 'users', label: 'Gestión de Usuarios' }] : []),
     { id: 'auth', label: 'Cerrar Sesión' }
   ];
 
@@ -53,5 +52,5 @@ const DashboardLayout = ({ children, onNavigate, currentPath }) => {
   );
 };
 
-// Memorizamos el layout completo
+
 export default React.memo(DashboardLayout);
