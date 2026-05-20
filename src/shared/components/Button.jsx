@@ -1,12 +1,9 @@
-// src/shared/components/Button.jsx
 import React, { useMemo } from 'react';
 
 const Button = ({ onClick, children, type = 'button', variant = 'primary', disabled = false }) => {
   
-  // Memorizamos las clases base para no recalcularlas en cada render
   const baseClasses = "px-4 py-2 rounded font-medium focus:outline-none transition-colors duration-200";
   
-  // Memorizamos la concatenación de clases dependiendo de la variante elegida
   const buttonClasses = useMemo(() => {
     switch (variant) {
       case 'secondary':
@@ -30,6 +27,4 @@ const Button = ({ onClick, children, type = 'button', variant = 'primary', disab
     </button>
   );
 };
-
-// Envolvemos la exportación con React.memo para evitar re-renderizados innecesarios
 export default React.memo(Button);

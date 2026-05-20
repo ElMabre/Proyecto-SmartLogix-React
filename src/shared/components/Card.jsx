@@ -1,4 +1,3 @@
-// src/shared/components/Card.jsx
 import React from 'react';
 
 const Card = ({ children, title, className = '' }) => {
@@ -16,5 +15,4 @@ const Card = ({ children, title, className = '' }) => {
   );
 };
 
-// Memorizamos el componente para optimizar el árbol de renderizado de React
 export default React.memo(Card);

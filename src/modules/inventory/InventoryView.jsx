@@ -1,4 +1,3 @@
-// src/modules/inventory/InventoryView.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
@@ -7,8 +6,6 @@ const InventoryView = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Estados para el formulario
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
@@ -41,7 +38,6 @@ const InventoryView = () => {
       }
 
       const data = await response.json();
-      // Ordenamos los productos por ID para que la lista sea estable al editar
       const sortedData = data.sort((a, b) => a.id - b.id);
       setProducts(sortedData);
     } catch (err) {
@@ -70,13 +66,11 @@ const InventoryView = () => {
       quantity: product.totalQuantity
     });
     setShowForm(true);
-    // Hacemos scroll suave hacia el formulario
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleToggleForm = () => {
     if (showForm) {
-      // Si estamos cerrando el formulario, limpiamos los estados
       setShowForm(false);
       setEditingProduct(null);
       setFormData({ name: '', quantity: 1 });
@@ -94,9 +88,6 @@ const InventoryView = () => {
     }
 
     const qty = parseInt(formData.quantity);
-    
-    // El payload inicial asume creación. 
-    // Al hacer PUT, el backend usará 'name' y 'totalQuantity' para re-calcular todo.
     const payload = {
       name: formData.name,
       totalQuantity: qty,
@@ -116,8 +107,6 @@ const InventoryView = () => {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-
-      // Definimos si es creación o actualización
       const url = editingProduct 
         ? `http://localhost:8080/products/${editingProduct.id}` 
         : 'http://localhost:8080/products';
@@ -133,8 +122,6 @@ const InventoryView = () => {
       if (!response.ok) {
         throw new Error(`Error al ${editingProduct ? 'actualizar' : 'guardar'} el producto en el inventario`);
       }
-
-      // Limpiamos el formulario y recargamos la lista
       setFormData({ name: '', quantity: 1 });
       setEditingProduct(null);
       setShowForm(false);

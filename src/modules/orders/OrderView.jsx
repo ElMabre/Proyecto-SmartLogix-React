@@ -1,13 +1,10 @@
-// src/modules/orders/OrderView.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
 
-// Precio simulado para el cálculo comercial
 const MOCK_PRICE = 15000; 
-const IVA_RATE = 0.19; // 19% IVA Chileno
+const IVA_RATE = 0.19;
 
-// Diccionario para traducir estados al español
 const statusTranslations = {
   'CONFIRMED': 'Confirmado',
   'PENDING': 'Pendiente',
@@ -34,7 +31,6 @@ const OrderView = () => {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   
-  // Estado para el modal de detalles
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(false);
@@ -160,7 +156,6 @@ const OrderView = () => {
     }
   };
 
-  // Función para cambiar estado del pedido
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       setStatusUpdateLoading(true);
@@ -176,11 +171,8 @@ const OrderView = () => {
       });
 
       if (!response.ok) throw new Error('Error al actualizar el estado en el servidor');
-      
-      // Actualizamos localmente y recargamos para asegurar sincronización
+
       await fetchData();
-      
-      // Actualizamos la orden seleccionada en el modal para que refleje el cambio instantáneamente
       setSelectedOrder(prev => ({...prev, status: newStatus}));
     } catch (err) {
       setError(err.message);

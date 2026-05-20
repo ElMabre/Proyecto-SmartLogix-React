@@ -1,10 +1,7 @@
-// src/core/services/authService.js
-
 const API_URL = import.meta.env.VITE_API_GATEWAY_URL;
 
 export const loginReal = async (credentials) => {
   try {
-    // Hacemos la petición POST al API Gateway, apuntando a la ruta del Auth Service
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: {

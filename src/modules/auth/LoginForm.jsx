@@ -1,4 +1,3 @@
-// src/modules/auth/LoginForm.jsx
 import React, { useState, useCallback } from 'react';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
@@ -19,7 +18,6 @@ const LoginForm = ({ onLogin }) => {
     setLoading(true);
     
     try {
-      // Hacemos el POST directo al Auth Service a través de tu API Gateway
       const response = await fetch('http://localhost:8080/auth/login', {
         method: 'POST',
         headers: {
@@ -31,19 +29,14 @@ const LoginForm = ({ onLogin }) => {
       if (!response.ok) {
         throw new Error('Credenciales inválidas o error de conexión con SmartLogix.');
       }
-
-      // El backend devuelve los datos de LoginResponse.java
       const userData = await response.json();
       
-      // Guardamos el JWT y los datos clave en el localStorage para usar en el resto de la app
       if (userData && userData.token) {
         localStorage.setItem('smartlogix_jwt', userData.token);
-        localStorage.setItem('smartlogix_pyme_id', userData.pymeId); // Guardamos la PYME
-        localStorage.setItem('smartlogix_role', userData.role);      // Guardamos el ROL
-        localStorage.setItem('smartlogix_user_id', userData.userId); // Guardamos el ID del usuario
+        localStorage.setItem('smartlogix_pyme_id', userData.pymeId); 
+        localStorage.setItem('smartlogix_role', userData.role);      
+        localStorage.setItem('smartlogix_user_id', userData.userId); 
       }
-      
-      // Pasamos los datos al nivel superior para cambiar la vista (App.jsx)
       onLogin(userData);
     } catch (err) {
       setError(err.message || 'Error al conectar con el servidor.');
