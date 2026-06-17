@@ -1,7 +1,7 @@
-// src/modules/users/UserManagementView.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
+import axiosInstance from '../../core/api/axiosInstance';
 
 const UserManagementView = () => {
   const [users, setUsers] = useState([]);
@@ -10,7 +10,6 @@ const UserManagementView = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
-  // Usamos pymeId (camelCase) para coincidir con el backend
   const [formData, setFormData] = useState({
     email: '', 
     nombre: '', 
@@ -20,34 +19,34 @@ const UserManagementView = () => {
     password: '' 
   });
 
-  const fetchUsers = async () => {
+  // Usamos useCallback para memorizar la función y poder llamarla desde useEffect y otros handlers
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('smartlogix_jwt');
-      const response = await fetch('http://localhost:8080/users', {
+      setError(null);
+      
+      // Axios inyecta el JWT. Nosotros inyectamos el header custom pyme_id
+      const response = await axiosInstance.get('/users', {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'pyme_id': '50' // Requerido por tu UserController
         }
       });
       
-      if (response.status === 401 || response.status === 403) {
-        throw new Error('Sesión expirada. Por favor, cierra sesión y vuelve a ingresar.');
-      }
-      if (!response.ok) throw new Error('Error al cargar los usuarios desde el servidor');
-      
-      const data = await response.json();
-      setUsers(data);
+      setUsers(response.data);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || 'Error al cargar los usuarios desde el servidor');
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchUsers();
   }, []);
+
+  // Solución elegante al error del linter (eslint react-hooks/exhaustive-deps)
+  useEffect(() => {
+    const loadData = async () => {
+      await fetchUsers();
+    };
+    loadData();
+  }, [fetchUsers]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -59,31 +58,18 @@ const UserManagementView = () => {
 
   const handleToggleStatus = async (user) => {
     try {
-      const token = localStorage.getItem('smartlogix_jwt');
       const newStatus = !user.isActive;
       
-      const response = await fetch(`http://localhost:8080/users/${user.id}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ isActive: newStatus })
-      });
-
-      if (response.status === 401 || response.status === 403) {
-        throw new Error('Sesión expirada. Por favor, cierra sesión y vuelve a ingresar.');
-      }
-      if (!response.ok) throw new Error('Error al cambiar el estado del usuario');
+      // Patch con Axios
+      await axiosInstance.patch(`/users/${user.id}/status`, { isActive: newStatus });
       
       await fetchUsers(); 
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || 'Error al cambiar el estado del usuario');
     }
   };
 
   const handleEdit = (user) => {
-    // Evitamos el error "uncontrolled input" asegurando que nunca sean undefined
     setFormData({
       email: user.email || '',
       nombre: user.nombre || '',
@@ -103,10 +89,6 @@ const UserManagementView = () => {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('smartlogix_jwt');
-      const url = editingId ? `http://localhost:8080/users/${editingId}` : 'http://localhost:8080/users';
-      const method = editingId ? 'PUT' : 'POST';
-
       const payload = {
         email: formData.email,
         nombre: formData.nombre,
@@ -116,20 +98,18 @@ const UserManagementView = () => {
         isActive: formData.isActive
       };
 
-      const response = await fetch(url, {
-        method: method,
+      // Configuración extra para enviar el header pyme_id en POST/PUT
+      const axiosConfig = {
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'pyme_id': formData.pymeId.toString() // Requerido por el @RequestHeader del backend
-        },
-        body: JSON.stringify(payload)
-      });
+          'pyme_id': formData.pymeId.toString()
+        }
+      };
 
-      if (response.status === 401 || response.status === 403) {
-        throw new Error('Sesión expirada. Por favor, cierra sesión y vuelve a ingresar.');
+      if (editingId) {
+        await axiosInstance.put(`/users/${editingId}`, payload, axiosConfig);
+      } else {
+        await axiosInstance.post('/users', payload, axiosConfig);
       }
-      if (!response.ok) throw new Error('Error al guardar el usuario en el servidor');
 
       setFormData({ email: '', nombre: '', role: 'USER', pymeId: '', isActive: true, password: '' });
       setShowForm(false);
@@ -137,7 +117,7 @@ const UserManagementView = () => {
       
       await fetchUsers(); 
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || 'Error al guardar el usuario en el servidor');
     } finally {
       setLoading(false);
     }
