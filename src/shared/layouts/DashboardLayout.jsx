@@ -4,6 +4,7 @@ const DashboardLayout = ({ children, onNavigate, currentPath, userRole }) => {
   const menuItems = [
     { id: 'inventory', label: 'Inventario' },
     { id: 'orders', label: 'Pedidos' },
+    { id: 'shipping', label: 'Envíos' },
     ...(userRole === 'ADMIN' ? [{ id: 'users', label: 'Gestión de Usuarios' }] : []),
     { id: 'auth', label: 'Cerrar Sesión' }
   ];
