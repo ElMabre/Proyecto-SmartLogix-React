@@ -79,14 +79,6 @@ const ShippingView = () => {
     setIsModalOpen(true);
   };
 
-  const formatCurrency = (amount) => {
-    if (amount == null) return "$0";
-    return new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency: "CLP",
-    }).format(amount);
-  };
-
   const formatDate = (value) => {
     if (!value) return "N/A";
     return new Date(value).toLocaleString("es-CL", {
@@ -301,10 +293,6 @@ const ShippingView = () => {
                     {selectedShipment.estimatedDays != null
                       ? `${selectedShipment.estimatedDays} días`
                       : "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Costo:</span>{" "}
-                    {formatCurrency(selectedShipment.cost)}
                   </p>
                   <p>
                     <span className="font-medium">Creado:</span>{" "}
