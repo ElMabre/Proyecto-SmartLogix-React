@@ -1,12 +1,14 @@
-import React from 'react';
+import React from "react";
 
 const DashboardLayout = ({ children, onNavigate, currentPath, userRole }) => {
   const menuItems = [
-    { id: 'inventory', label: 'Inventario' },
-    { id: 'orders', label: 'Pedidos' },
-    { id: 'shipping', label: 'Envíos' },
-    ...(userRole === 'ADMIN' ? [{ id: 'users', label: 'Gestión de Usuarios' }] : []),
-    { id: 'auth', label: 'Cerrar Sesión' }
+    { id: "inventory", label: "Inventario" },
+    { id: "orders", label: "Pedidos" },
+    { id: "shipping", label: "Envíos" },
+    ...(userRole === "ADMIN"
+      ? [{ id: "users", label: "Gestión de Usuarios" }]
+      : []),
+    { id: "auth", label: "Cerrar Sesión" },
   ];
 
   return (
@@ -17,18 +19,20 @@ const DashboardLayout = ({ children, onNavigate, currentPath, userRole }) => {
           <h1 className="text-2xl font-heading font-bold text-blue-400">
             SmartLogix
           </h1>
-          <p className="text-sm text-slate-400 mt-1 font-sans">Panel Administrativo</p>
+          <p className="text-sm text-slate-400 mt-1 font-sans">
+            Panel Administrativo
+          </p>
         </div>
-        
+
         <nav className="flex-1 p-4 space-y-2">
           {menuItems.map((item) => (
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={`w-full text-left px-4 py-3 rounded transition-colors duration-200 ${
-                currentPath === item.id 
-                  ? 'bg-blue-600 text-white font-medium' 
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                currentPath === item.id
+                  ? "bg-blue-600 text-white font-medium"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
               }`}
             >
               {item.label}
@@ -37,21 +41,17 @@ const DashboardLayout = ({ children, onNavigate, currentPath, userRole }) => {
         </nav>
       </aside>
 
-      {/* Área Principal de Contenido */}
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-gray-200 p-4 shadow-sm">
           <h2 className="text-lg font-heading text-gray-800 font-medium">
             Sistema de Gestión Logística
           </h2>
         </header>
-        
-        <div className="flex-1 overflow-auto p-6">
-          {children}
-        </div>
+
+        <div className="flex-1 overflow-auto p-6">{children}</div>
       </main>
     </div>
   );
 };
-
 
 export default React.memo(DashboardLayout);
