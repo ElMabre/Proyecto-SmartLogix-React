@@ -79,6 +79,7 @@ const OrderView = () => {
         setLoading(false);
       }
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch de datos al montar, patrón estándar de React
     loadData();
   }, []);
 
@@ -298,7 +299,6 @@ const OrderView = () => {
             
             <div className="p-4 space-y-4 font-sans">
               
-              {/* Sección Cambio de Estado */}
               <div className="bg-blue-50 p-3 rounded border border-blue-100">
                 <h4 className="text-xs uppercase tracking-wider text-blue-800 font-semibold mb-2">Gestionar Estado</h4>
                 <div className="flex items-center gap-3">
@@ -318,7 +318,6 @@ const OrderView = () => {
                 </div>
               </div>
 
-              {/* Sección Cliente */}
               <div>
                 <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">Datos del Cliente</h4>
                 <div className="bg-gray-50 p-3 rounded border text-sm text-gray-700 space-y-1">
@@ -329,7 +328,6 @@ const OrderView = () => {
                 </div>
               </div>
 
-              {/* Sección Artículos */}
               <div>
                 <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">Artículos Solicitados</h4>
                 <div className="bg-gray-50 p-3 rounded border text-sm text-gray-700">
@@ -347,7 +345,6 @@ const OrderView = () => {
                 </div>
               </div>
 
-              {/* Sección Financiera */}
               <div>
                 <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">Resumen de Pago</h4>
                 <div className="bg-gray-50 p-3 rounded border text-sm text-gray-700 space-y-2">
