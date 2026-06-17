@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import axiosInstance from '../../core/api/axiosInstance';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
 
@@ -8,63 +9,47 @@ const InventoryView = () => {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-
-  const [formData, setFormData] = useState({
-    name: '',
-    quantity: 1
-  });
+  const [formData, setFormData] = useState({ name: '', quantity: 1 });
 
   const fetchProducts = async () => {
     try {
       setLoading(true);
       setError(null);
-
-      const token = localStorage.getItem('smartlogix_jwt');
-      const headers = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch('http://localhost:8080/products', {
-        method: 'GET',
-        headers: headers
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al obtener el inventario desde el servidor');
-      }
-
-      const data = await response.json();
-      const sortedData = data.sort((a, b) => a.id - b.id);
+      const response = await axiosInstance.get('/products');
+      const sortedData = response.data.sort((a, b) => a.id - b.id);
       setProducts(sortedData);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || 'Error al obtener el inventario');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
+    const loadProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axiosInstance.get('/products');
+        const sortedData = response.data.sort((a, b) => a.id - b.id);
+        setProducts(sortedData);
+      } catch (err) {
+        setError(err.response?.data?.message || 'Error al obtener el inventario');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProducts();
   }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleEditClick = (product) => {
     setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      quantity: product.totalQuantity
-    });
+    setFormData({ name: product.name, quantity: product.totalQuantity });
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -81,7 +66,6 @@ const InventoryView = () => {
 
   const handleSubmitProduct = async (e) => {
     e.preventDefault();
-
     if (!formData.name.trim() || formData.quantity < 1) {
       setError('Por favor, ingresa un nombre válido y una cantidad mayor a 0.');
       return;
@@ -98,38 +82,17 @@ const InventoryView = () => {
     try {
       setLoading(true);
       setError(null);
-
-      const token = localStorage.getItem('smartlogix_jwt');
-      const headers = {
-        'Content-Type': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      const url = editingProduct 
-        ? `http://localhost:8080/products/${editingProduct.id}` 
-        : 'http://localhost:8080/products';
-      
-      const method = editingProduct ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method: method,
-        headers: headers,
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error al ${editingProduct ? 'actualizar' : 'guardar'} el producto en el inventario`);
+      if (editingProduct) {
+        await axiosInstance.put(`/products/${editingProduct.id}`, payload);
+      } else {
+        await axiosInstance.post('/products', payload);
       }
       setFormData({ name: '', quantity: 1 });
       setEditingProduct(null);
       setShowForm(false);
-      
       await fetchProducts();
-
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || `Error al ${editingProduct ? 'actualizar' : 'guardar'} el producto`);
       setLoading(false);
     }
   };
@@ -142,7 +105,6 @@ const InventoryView = () => {
         </div>
       );
     }
-
     return (
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white border border-gray-200 rounded-lg">
@@ -169,10 +131,7 @@ const InventoryView = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500 font-sans">{product.reservedQuantity}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-center font-medium text-gray-700 font-sans">{product.totalQuantity}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-center font-sans">
-                  <button 
-                    onClick={() => handleEditClick(product)}
-                    className="text-blue-600 hover:text-blue-900 font-medium transition-colors"
-                  >
+                  <button onClick={() => handleEditClick(product)} className="text-blue-600 hover:text-blue-900 font-medium transition-colors">
                     Editar
                   </button>
                 </td>
@@ -187,9 +146,7 @@ const InventoryView = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-heading font-bold text-gray-800">
-          Catálogo de Inventario
-        </h1>
+        <h1 className="text-2xl font-heading font-bold text-gray-800">Catálogo de Inventario</h1>
         <Button onClick={handleToggleForm} disabled={loading}>
           {showForm ? 'Cancelar' : 'Nuevo Producto'}
         </Button>
@@ -202,46 +159,19 @@ const InventoryView = () => {
           <form onSubmit={handleSubmitProduct} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
-                  Nombre del Producto
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  placeholder="Ej. Silla Ergonomica"
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans"
-                  required
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Nombre del Producto</label>
+                <input type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="Ej. Silla Ergonomica" className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans" required />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
                   {editingProduct ? 'Modificar Cantidad Total' : 'Cantidad Inicial (Stock Total)'}
                 </label>
-                <input
-                  type="number"
-                  name="quantity"
-                  min={editingProduct ? "0" : "1"}
-                  value={formData.quantity}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans"
-                  required
-                />
-                {editingProduct && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Nota: El stock disponible se ajustará automáticamente según esta nueva cantidad total.
-                  </p>
-                )}
+                <input type="number" name="quantity" min={editingProduct ? "0" : "1"} value={formData.quantity} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans" required />
               </div>
             </div>
             <div className="pt-2 flex justify-end gap-3">
               {editingProduct && (
-                <button
-                  type="button"
-                  onClick={handleToggleForm}
-                  className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-medium font-sans"
-                >
+                <button type="button" onClick={handleToggleForm} className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-medium font-sans">
                   Cancelar Edición
                 </button>
               )}
@@ -266,4 +196,4 @@ const InventoryView = () => {
   );
 };
 
-export default React.memo(InventoryView);
+export default InventoryView;

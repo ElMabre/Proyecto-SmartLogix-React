@@ -1,6 +1,4 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { initMockDB } from './core/storage/mockDatabase';
+import { useState, useCallback } from 'react';
 import DashboardLayout from './shared/layouts/DashboardLayout';
 import LoginForm from './modules/auth/LoginForm';
 import InventoryView from './modules/inventory/InventoryView';
@@ -11,31 +9,22 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [currentPath, setCurrentPath] = useState('inventory');
 
-  useEffect(() => {
-    initMockDB();
-  }, []);
-
-
   const handleLogin = useCallback((userData) => {
     setUser(userData);
     setCurrentPath('inventory'); 
   }, []);
 
-
   const handleNavigate = useCallback((path) => {
     if (path === 'auth') {
-
       setUser(null);
     } else {
       setCurrentPath(path);
     }
   }, []);
 
-
   if (!user) {
     return <LoginForm onLogin={handleLogin} />;
   }
-
 
   return (
     <DashboardLayout onNavigate={handleNavigate} currentPath={currentPath} userRole={user?.role}>

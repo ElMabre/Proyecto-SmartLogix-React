@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Card from '../../shared/components/Card';
 import Button from '../../shared/components/Button';
+import axiosInstance from '../../core/api/axiosInstance';
 
 const MOCK_PRICE = 15000; 
 const IVA_RATE = 0.19;
@@ -48,38 +49,37 @@ const OrderView = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const token = localStorage.getItem('smartlogix_jwt');
-      const headers = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
       const [ordersRes, productsRes] = await Promise.all([
-        fetch('http://localhost:8080/orders', { method: 'GET', headers }),
-        fetch('http://localhost:8080/products', { method: 'GET', headers })
+        axiosInstance.get('/orders'),
+        axiosInstance.get('/products')
       ]);
-      
-      if (!ordersRes.ok) throw new Error('Error al obtener los pedidos');
-      if (!productsRes.ok) throw new Error('Error al obtener el inventario');
-      
-      const ordersData = await ordersRes.json();
-      const productsData = await productsRes.json();
-      
-      setOrders(ordersData);
-      setProducts(productsData);
+      setOrders(ordersRes.data);
+      setProducts(productsRes.data);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || 'Error al obtener los datos del servidor');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const [ordersRes, productsRes] = await Promise.all([
+          axiosInstance.get('/orders'),
+          axiosInstance.get('/products')
+        ]);
+        setOrders(ordersRes.data);
+        setProducts(productsRes.data);
+      } catch (err) {
+        setError(err.response?.data?.message || 'Error al obtener los datos del servidor');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, []);
 
   const handleInputChange = (e) => {
@@ -120,24 +120,7 @@ const OrderView = () => {
       setLoading(true);
       setError(null);
       
-      const token = localStorage.getItem('smartlogix_jwt');
-      const headers = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch('http://localhost:8080/orders', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(newOrder),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al registrar el pedido en el backend');
-      }
+      await axiosInstance.post('/orders', newOrder);
       
       setFormData({ 
         productId: '', 
@@ -151,7 +134,8 @@ const OrderView = () => {
       
       await fetchData();
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || 'Error al registrar el pedido en el backend');
+    } finally {
       setLoading(false);
     }
   };
@@ -159,23 +143,13 @@ const OrderView = () => {
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       setStatusUpdateLoading(true);
-      const token = localStorage.getItem('smartlogix_jwt');
       
-      const response = await fetch(`http://localhost:8080/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (!response.ok) throw new Error('Error al actualizar el estado en el servidor');
+      await axiosInstance.patch(`/orders/${orderId}/status`, { status: newStatus });
 
       await fetchData();
       setSelectedOrder(prev => ({...prev, status: newStatus}));
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || 'Error al actualizar el estado en el servidor');
     } finally {
       setStatusUpdateLoading(false);
     }
@@ -251,7 +225,6 @@ const OrderView = () => {
         <Card title="Crear Nuevo Pedido Logístico">
           <form onSubmit={handleSubmitOrder} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-100 pb-4">
-              {/* Resto del formulario igual que antes... */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Nombre del Cliente</label>
                 <input type="text" name="customerName" value={formData.customerName} onChange={handleInputChange} placeholder="Ej. Juan Pérez" className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none font-sans" required />
