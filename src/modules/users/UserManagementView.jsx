@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import Card from '../../shared/components/Card';
-import Button from '../../shared/components/Button';
-import axiosInstance from '../../core/api/axiosInstance';
+import React, { useState, useEffect, useCallback } from "react";
+import Card from "../../shared/components/Card";
+import Button from "../../shared/components/Button";
+import axiosInstance from "../../core/api/axiosInstance";
 
 const UserManagementView = () => {
   const [users, setUsers] = useState([]);
@@ -9,38 +9,38 @@ const UserManagementView = () => {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  
+
   const [formData, setFormData] = useState({
-    email: '', 
-    nombre: '', 
-    role: 'USER', 
-    pymeId: '', 
+    email: "",
+    nombre: "",
+    role: "USER",
+    pymeId: "",
     isActive: true,
-    password: '' 
+    password: "",
   });
 
-  // Usamos useCallback para memorizar la función y poder llamarla desde useEffect y otros handlers
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      // Axios inyecta el JWT. Nosotros inyectamos el header custom pyme_id
-      const response = await axiosInstance.get('/users', {
+
+      const response = await axiosInstance.get("/users", {
         headers: {
-          'pyme_id': '50' // Requerido por tu UserController
-        }
+          pyme_id: "50",
+        },
       });
-      
+
       setUsers(response.data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al cargar los usuarios desde el servidor');
+      setError(
+        err.response?.data?.message ||
+          "Error al cargar los usuarios desde el servidor",
+      );
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Solución elegante al error del linter (eslint react-hooks/exhaustive-deps)
   useEffect(() => {
     const loadData = async () => {
       await fetchUsers();
@@ -50,37 +50,39 @@ const UserManagementView = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
   const handleToggleStatus = async (user) => {
     try {
       const newStatus = !user.isActive;
-      
-      // Patch con Axios
-      await axiosInstance.patch(`/users/${user.id}/status`, { isActive: newStatus });
-      
-      await fetchUsers(); 
+      await axiosInstance.patch(`/users/${user.id}/status`, {
+        isActive: newStatus,
+      });
+
+      await fetchUsers();
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al cambiar el estado del usuario');
+      setError(
+        err.response?.data?.message || "Error al cambiar el estado del usuario",
+      );
     }
   };
 
   const handleEdit = (user) => {
     setFormData({
-      email: user.email || '',
-      nombre: user.nombre || '',
-      role: user.role || 'USER',
-      pymeId: user.pymeId || user.pyme_id || '', 
+      email: user.email || "",
+      nombre: user.nombre || "",
+      role: user.role || "USER",
+      pymeId: user.pymeId || user.pyme_id || "",
       isActive: user.isActive !== undefined ? user.isActive : true,
-      password: '' 
+      password: "",
     });
     setEditingId(user.id);
     setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSubmit = async (e) => {
@@ -95,29 +97,38 @@ const UserManagementView = () => {
         role: formData.role,
         pymeId: parseInt(formData.pymeId),
         password: formData.password,
-        isActive: formData.isActive
+        isActive: formData.isActive,
       };
 
-      // Configuración extra para enviar el header pyme_id en POST/PUT
       const axiosConfig = {
         headers: {
-          'pyme_id': formData.pymeId.toString()
-        }
+          pyme_id: formData.pymeId.toString(),
+        },
       };
 
       if (editingId) {
         await axiosInstance.put(`/users/${editingId}`, payload, axiosConfig);
       } else {
-        await axiosInstance.post('/users', payload, axiosConfig);
+        await axiosInstance.post("/users", payload, axiosConfig);
       }
 
-      setFormData({ email: '', nombre: '', role: 'USER', pymeId: '', isActive: true, password: '' });
+      setFormData({
+        email: "",
+        nombre: "",
+        role: "USER",
+        pymeId: "",
+        isActive: true,
+        password: "",
+      });
       setShowForm(false);
       setEditingId(null);
-      
-      await fetchUsers(); 
+
+      await fetchUsers();
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al guardar el usuario en el servidor');
+      setError(
+        err.response?.data?.message ||
+          "Error al guardar el usuario en el servidor",
+      );
     } finally {
       setLoading(false);
     }
@@ -126,55 +137,127 @@ const UserManagementView = () => {
   const handleCancel = () => {
     setShowForm(false);
     setEditingId(null);
-    setFormData({ email: '', nombre: '', role: 'USER', pymeId: '', isActive: true, password: '' });
+    setFormData({
+      email: "",
+      nombre: "",
+      role: "USER",
+      pymeId: "",
+      isActive: true,
+      password: "",
+    });
     setError(null);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-heading font-bold text-gray-800">Gestión de Usuarios</h1>
-        <Button onClick={() => showForm ? handleCancel() : setShowForm(true)} disabled={loading}>
-          {showForm ? 'Cancelar' : 'Nuevo Usuario'}
+        <h1 className="text-2xl font-heading font-bold text-gray-800">
+          Gestión de Usuarios
+        </h1>
+        <Button
+          onClick={() => (showForm ? handleCancel() : setShowForm(true))}
+          disabled={loading}
+        >
+          {showForm ? "Cancelar" : "Nuevo Usuario"}
         </Button>
       </div>
 
-      {error && <div className="p-3 bg-red-100 text-red-700 rounded font-sans text-sm">{error}</div>}
+      {error && (
+        <div className="p-3 bg-red-100 text-red-700 rounded font-sans text-sm">
+          {error}
+        </div>
+      )}
 
       {showForm && (
-        <Card title={editingId ? `Editar Usuario #${editingId}` : "Crear Nuevo Usuario"}>
+        <Card
+          title={
+            editingId ? `Editar Usuario #${editingId}` : "Crear Nuevo Usuario"
+          }
+        >
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Nombre Completo</label>
-                <input type="text" name="nombre" value={formData.nombre} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none font-sans" required />
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                  Nombre Completo
+                </label>
+                <input
+                  type="text"
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none font-sans"
+                  required
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Correo Electrónico</label>
-                <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none font-sans" required disabled={!!editingId} />
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                  Correo Electrónico
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none font-sans"
+                  required
+                  disabled={!!editingId}
+                />
               </div>
               {!editingId && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Contraseña</label>
-                  <input type="password" name="password" value={formData.password} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none font-sans" required={!editingId} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                    Contraseña
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none font-sans"
+                    required={!editingId}
+                  />
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">Rol del Usuario</label>
-                <select name="role" value={formData.role} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none font-sans bg-white">
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                  Rol del Usuario
+                </label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none font-sans bg-white"
+                >
                   <option value="USER">Usuario (Lectura/Escritura Pyme)</option>
                   <option value="ADMIN">Administrador Global</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">ID de Pyme Asignada</label>
-                <input type="number" name="pymeId" value={formData.pymeId} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none font-sans" required />
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                  ID de Pyme Asignada
+                </label>
+                <input
+                  type="number"
+                  name="pymeId"
+                  value={formData.pymeId}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 outline-none font-sans"
+                  required
+                />
               </div>
             </div>
-            
+
             <div className="pt-4 flex justify-end gap-2">
-              <button type="button" onClick={handleCancel} className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-sans font-medium">Cancelar</button>
-              <Button type="submit">{editingId ? 'Actualizar Usuario' : 'Crear Usuario'}</Button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-sans font-medium"
+              >
+                Cancelar
+              </button>
+              <Button type="submit">
+                {editingId ? "Actualizar Usuario" : "Crear Usuario"}
+              </Button>
             </div>
           </form>
         </Card>
@@ -186,7 +269,9 @@ const UserManagementView = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
         ) : users.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 font-sans">No hay usuarios registrados.</div>
+          <div className="text-center py-8 text-gray-500 font-sans">
+            No hay usuarios registrados.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -200,27 +285,46 @@ const UserManagementView = () => {
                 </tr>
               </thead>
               <tbody className="text-sm font-sans divide-y divide-gray-100">
-                {users.map(user => (
-                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                {users.map((user) => (
+                  <tr
+                    key={user.id}
+                    className="hover:bg-gray-50 transition-colors"
+                  >
                     <td className="p-3">
-                      <div className="font-medium text-gray-800">{user.nombre}</div>
+                      <div className="font-medium text-gray-800">
+                        {user.nombre}
+                      </div>
                       <div className="text-gray-500 text-xs">{user.email}</div>
                     </td>
                     <td className="p-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${user.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${user.role === "ADMIN" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"}`}
+                      >
                         {user.role}
                       </span>
                     </td>
-                    <td className="p-3 font-medium text-gray-700">{user.pymeId || user.pyme_id}</td>
+                    <td className="p-3 font-medium text-gray-700">
+                      {user.pymeId || user.pyme_id}
+                    </td>
                     <td className="p-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${user.isActive === false ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                        {user.isActive === false ? 'INACTIVO' : 'ACTIVO'}
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${user.isActive === false ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}
+                      >
+                        {user.isActive === false ? "INACTIVO" : "ACTIVO"}
                       </span>
                     </td>
                     <td className="p-3 flex justify-end gap-2">
-                      <button onClick={() => handleEdit(user)} className="text-blue-600 hover:text-blue-800 px-2 py-1 border border-transparent hover:border-blue-200 rounded transition-colors">Editar</button>
-                      <button onClick={() => handleToggleStatus(user)} className={`${user.isActive === false ? 'text-green-600 hover:text-green-800 hover:bg-green-50' : 'text-red-600 hover:text-red-800 hover:bg-red-50'} px-2 py-1 rounded transition-colors`}>
-                        {user.isActive === false ? 'Habilitar' : 'Bloquear'}
+                      <button
+                        onClick={() => handleEdit(user)}
+                        className="text-blue-600 hover:text-blue-800 px-2 py-1 border border-transparent hover:border-blue-200 rounded transition-colors"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleToggleStatus(user)}
+                        className={`${user.isActive === false ? "text-green-600 hover:text-green-800 hover:bg-green-50" : "text-red-600 hover:text-red-800 hover:bg-red-50"} px-2 py-1 rounded transition-colors`}
+                      >
+                        {user.isActive === false ? "Habilitar" : "Bloquear"}
                       </button>
                     </td>
                   </tr>

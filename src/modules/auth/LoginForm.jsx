@@ -1,49 +1,54 @@
-import React, { useState, useCallback } from 'react';
-import Card from '../../shared/components/Card';
-import Button from '../../shared/components/Button';
+import React, { useState, useCallback } from "react";
+import Card from "../../shared/components/Card";
+import Button from "../../shared/components/Button";
 
 const LoginForm = ({ onLogin }) => {
-  const [credentials, setCredentials] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
+  const [credentials, setCredentials] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
-    setCredentials(prev => ({ ...prev, [name]: value }));
+    setCredentials((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  const handleSubmit = useCallback(async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    
-    try {
-      const response = await fetch('http://localhost:8080/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setError("");
+      setLoading(true);
 
-      if (!response.ok) {
-        throw new Error('Credenciales inválidas o error de conexión con SmartLogix.');
+      try {
+        const response = await fetch("http://localhost:8080/auth/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(credentials),
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            "Credenciales inválidas o error de conexión con SmartLogix.",
+          );
+        }
+        const userData = await response.json();
+
+        if (userData && userData.token) {
+          localStorage.setItem("smartlogix_jwt", userData.token);
+          localStorage.setItem("smartlogix_pyme_id", userData.pymeId);
+          localStorage.setItem("smartlogix_role", userData.role);
+          localStorage.setItem("smartlogix_user_id", userData.userId);
+        }
+        onLogin(userData);
+      } catch (err) {
+        setError(err.message || "Error al conectar con el servidor.");
+      } finally {
+        setLoading(false);
       }
-      const userData = await response.json();
-      
-      if (userData && userData.token) {
-        localStorage.setItem('smartlogix_jwt', userData.token);
-        localStorage.setItem('smartlogix_pyme_id', userData.pymeId); 
-        localStorage.setItem('smartlogix_role', userData.role);      
-        localStorage.setItem('smartlogix_user_id', userData.userId); 
-      }
-      onLogin(userData);
-    } catch (err) {
-      setError(err.message || 'Error al conectar con el servidor.');
-    } finally {
-      setLoading(false);
-    }
-  }, [credentials, onLogin]);
+    },
+    [credentials, onLogin],
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
@@ -83,7 +88,7 @@ const LoginForm = ({ onLogin }) => {
             </div>
             <div className="pt-4 flex justify-center">
               <Button type="submit" disabled={loading}>
-                {loading ? 'Conectando...' : 'Iniciar Sesión'}
+                {loading ? "Conectando..." : "Iniciar Sesión"}
               </Button>
             </div>
           </form>
