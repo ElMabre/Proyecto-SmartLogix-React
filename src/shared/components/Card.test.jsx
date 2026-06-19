@@ -1,5 +1,7 @@
+import React from 'react';
 import { render, screen } from '@testing-library/react'
 import Card from './Card'
+
 
 describe('Card', () => {
   it('muestra el título cuando se pasa la prop title', () => {

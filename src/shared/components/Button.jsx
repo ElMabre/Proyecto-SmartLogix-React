@@ -6,6 +6,7 @@ const Button = ({
   type = "button",
   variant = "primary",
   disabled = false,
+  ...rest  // ✅ FIX E: permite que data-testid y otros props lleguen al <button> del DOM
 }) => {
   const baseClasses =
     "px-4 py-2 rounded font-medium focus:outline-none transition-colors duration-200";
@@ -28,9 +29,11 @@ const Button = ({
       onClick={onClick}
       disabled={disabled}
       className={`${buttonClasses} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+      {...rest}  // ✅ FIX E: propaga data-testid, aria-*, y cualquier otro prop
     >
       {children}
     </button>
   );
 };
+
 export default React.memo(Button);

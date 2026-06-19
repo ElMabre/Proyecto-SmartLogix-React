@@ -1,11 +1,22 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Card from "../../shared/components/Card";
 import Button from "../../shared/components/Button";
-import axiosInstance from "../../core/api/axiosInstance";
+
+const API_BASE = import.meta.env.VITE_API_GATEWAY_URL || "";
+
+const getAuthHeaders = (extraHeaders = {}) => {
+  const token = localStorage.getItem("smartlogix_jwt");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extraHeaders,
+  };
+};
 
 const UserManagementView = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -24,18 +35,28 @@ const UserManagementView = () => {
       setLoading(true);
       setError(null);
 
-      const response = await axiosInstance.get("/users", {
-        headers: {
-          pyme_id: "50",
-        },
+      const response = await fetch(`${API_BASE}/users`, {
+        headers: getAuthHeaders({ pyme_id: "50" }),
       });
 
-      setUsers(response.data);
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error("Sesión expirada");
+        }
+        let errMsg = "Error al cargar los usuarios desde el servidor";
+        if (typeof response.json === "function") {
+          try {
+            const errData = await response.json();
+            if (errData?.message) errMsg = errData.message;
+          } catch (e) {}
+        }
+        throw new Error(errMsg);
+      }
+
+      const data = await response.json();
+      setUsers(data);
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Error al cargar los usuarios desde el servidor",
-      );
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -59,15 +80,20 @@ const UserManagementView = () => {
   const handleToggleStatus = async (user) => {
     try {
       const newStatus = !user.isActive;
-      await axiosInstance.patch(`/users/${user.id}/status`, {
-        isActive: newStatus,
+      
+      const response = await fetch(`${API_BASE}/users/${user.id}/status`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isActive: newStatus }),
       });
+
+      if (!response.ok) {
+        throw new Error("Error al cambiar el estado del usuario");
+      }
 
       await fetchUsers();
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Error al cambiar el estado del usuario",
-      );
+      setError("Error al cambiar el estado del usuario");
     }
   };
 
@@ -88,28 +114,36 @@ const UserManagementView = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    setLoading(true);
+    setSaving(true);
 
     try {
+      const pymeIdNum = parseInt(formData.pymeId);
+      if (isNaN(pymeIdNum) || pymeIdNum <= 0) {
+        setError("El ID de Pyme debe ser un número positivo.");
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         email: formData.email,
         nombre: formData.nombre,
         role: formData.role,
-        pymeId: parseInt(formData.pymeId),
+        pymeId: pymeIdNum,
         password: formData.password,
         isActive: formData.isActive,
       };
 
-      const axiosConfig = {
-        headers: {
-          pyme_id: formData.pymeId.toString(),
-        },
-      };
+      const url = editingId ? `${API_BASE}/users/${editingId}` : `${API_BASE}/users`;
+      const method = editingId ? "PUT" : "POST";
 
-      if (editingId) {
-        await axiosInstance.put(`/users/${editingId}`, payload, axiosConfig);
-      } else {
-        await axiosInstance.post("/users", payload, axiosConfig);
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders({ pyme_id: formData.pymeId.toString() }),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al guardar el usuario en el servidor");
       }
 
       setFormData({
@@ -125,12 +159,9 @@ const UserManagementView = () => {
 
       await fetchUsers();
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Error al guardar el usuario en el servidor",
-      );
+      setError("Error al guardar el usuario en el servidor");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -156,7 +187,7 @@ const UserManagementView = () => {
         </h1>
         <Button
           onClick={() => (showForm ? handleCancel() : setShowForm(true))}
-          disabled={loading}
+          disabled={saving || loading}
         >
           {showForm ? "Cancelar" : "Nuevo Usuario"}
         </Button>
@@ -177,10 +208,14 @@ const UserManagementView = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                <label
+                  htmlFor="user-nombre"
+                  className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                >
                   Nombre Completo
                 </label>
                 <input
+                  id="user-nombre"
                   type="text"
                   name="nombre"
                   value={formData.nombre}
@@ -190,10 +225,14 @@ const UserManagementView = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                <label
+                  htmlFor="user-email"
+                  className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                >
                   Correo Electrónico
                 </label>
                 <input
+                  id="user-email"
                   type="email"
                   name="email"
                   value={formData.email}
@@ -205,10 +244,14 @@ const UserManagementView = () => {
               </div>
               {!editingId && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                  <label
+                    htmlFor="user-password"
+                    className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                  >
                     Contraseña
                   </label>
                   <input
+                    id="user-password"
                     type="password"
                     name="password"
                     value={formData.password}
@@ -219,10 +262,14 @@ const UserManagementView = () => {
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                <label
+                  htmlFor="user-role"
+                  className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                >
                   Rol del Usuario
                 </label>
                 <select
+                  id="user-role"
                   name="role"
                   value={formData.role}
                   onChange={handleInputChange}
@@ -233,10 +280,14 @@ const UserManagementView = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                <label
+                  htmlFor="user-pymeId"
+                  className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                >
                   ID de Pyme Asignada
                 </label>
                 <input
+                  id="user-pymeId"
                   type="number"
                   name="pymeId"
                   value={formData.pymeId}
@@ -255,8 +306,12 @@ const UserManagementView = () => {
               >
                 Cancelar
               </button>
-              <Button type="submit">
-                {editingId ? "Actualizar Usuario" : "Crear Usuario"}
+              <Button type="submit" disabled={saving}>
+                {saving
+                  ? "Guardando..."
+                  : editingId
+                    ? "Actualizar Usuario"
+                    : "Crear Usuario"}
               </Button>
             </div>
           </form>
@@ -300,7 +355,7 @@ const UserManagementView = () => {
                       <span
                         className={`px-2 py-1 rounded text-xs font-medium ${user.role === "ADMIN" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"}`}
                       >
-                        {user.role}
+                        {user.role === "ADMIN" ? "Administrador" : user.role}
                       </span>
                     </td>
                     <td className="p-3 font-medium text-gray-700">

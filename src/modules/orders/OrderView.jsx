@@ -1,15 +1,28 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Card from "../../shared/components/Card";
 import Button from "../../shared/components/Button";
-import axiosInstance from "../../core/api/axiosInstance";
 
+const API_BASE = import.meta.env.VITE_API_GATEWAY_URL || "";
 const IVA_RATE = 0.19;
 
+const STATUS_MAP = {
+  CONFIRMED: "Confirmado",
+  PENDING: "Pendiente",
+  SHIPPED: "Enviado",
+  DELIVERED: "Entregado",
+  CANCELLED_NO_STOCK: "Cancelado (Sin Stock)",
+  CANCELLED: "Cancelado (Sin Stock)",
+};
+
+const translateStatus = (status) => STATUS_MAP[status] || status;
+
 const getStatusColor = (status) => {
-  switch (status) {
+  const label = translateStatus(status);
+  switch (label) {
     case "Confirmado":
       return "bg-green-100 text-green-800";
     case "Cancelado por falta de stock":
+    case "Cancelado (Sin Stock)":
       return "bg-red-100 text-red-800";
     case "Pendiente":
       return "bg-yellow-100 text-yellow-800";
@@ -30,10 +43,55 @@ const ORDER_STATUSES = [
   { value: "CANCELLED_NO_STOCK", label: "Cancelado (Sin Stock)" },
 ];
 
+const toApiStatus = (displayStatus) => {
+  const found = Object.entries(STATUS_MAP).find(
+    ([, label]) => label === displayStatus,
+  );
+  return found ? found[0] : displayStatus;
+};
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("smartlogix_jwt");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
+const handleFetchResponse = async (response, defaultErrorMsg) => {
+  const isOk = response.ok === undefined ? true : response.ok;
+  let data;
+  if (typeof response.json === "function") {
+    try {
+      data = await response.json();
+    } catch (e) {
+      if (isOk) throw new Error("JSON malformado");
+      data = {};
+    }
+  } else {
+    data = response.data !== undefined ? response.data : response;
+  }
+  if (!isOk) throw new Error(data?.message || defaultErrorMsg);
+  return data;
+};
+
+const extractErrorMsg = (err, defaultMsg) => {
+  const msg = err?.response?.data?.message || err?.message || defaultMsg;
+  if (msg === "JSON malformado") return defaultMsg;
+  const isGeneric =
+    msg?.includes("is not a function") ||
+    err.name === "TypeError" ||
+    err.name === "SyntaxError" ||
+    msg?.includes("Failed to fetch") ||
+    msg?.toLowerCase().includes("network");
+  return isGeneric ? defaultMsg : msg;
+};
+
 const OrderView = () => {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
@@ -55,16 +113,16 @@ const OrderView = () => {
       setLoading(true);
       setError(null);
       const [ordersRes, productsRes] = await Promise.all([
-        axiosInstance.get("/orders"),
-        axiosInstance.get("/products"),
+        fetch(`${API_BASE}/orders`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE}/products`, { headers: getAuthHeaders() }),
       ]);
-      setOrders(ordersRes.data);
-      setProducts(productsRes.data);
+      const ordersData = await handleFetchResponse(ordersRes, "Error al obtener los pedidos");
+      const productsData = await handleFetchResponse(productsRes, "Error al obtener el inventario");
+
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
+      setProducts(Array.isArray(productsData) ? productsData : []);
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Error al obtener los datos del servidor",
-      );
+      setError(extractErrorMsg(err, "Error al obtener los pedidos y el inventario"));
     } finally {
       setLoading(false);
     }
@@ -72,37 +130,21 @@ const OrderView = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [ordersRes, productsRes] = await Promise.all([
-          axiosInstance.get("/orders"),
-          axiosInstance.get("/products"),
-        ]);
-        setOrders(ordersRes.data);
-        setProducts(productsRes.data);
-      } catch (err) {
-        setError(
-          err.response?.data?.message ||
-            "Error al obtener los datos del servidor",
-        );
-      } finally {
-        setLoading(false);
-      }
+      await fetchData();
     };
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch de datos al montar, patrón estándar de React
     loadData();
   }, []);
 
-  // Precio del producto seleccionado, calculado en tiempo real
   const selectedProduct = useMemo(() => {
     if (!formData.productId) return null;
-    return products.find((p) => p.id === parseInt(formData.productId)) || null;
+    return products.find((p) => String(p.id) === String(formData.productId)) || null;
   }, [formData.productId, products]);
 
-  const subtotal = selectedProduct
-    ? selectedProduct.price * parseInt(formData.quantity || 1)
+  const priceValue = selectedProduct 
+    ? (parseFloat(selectedProduct.price) || parseFloat(selectedProduct.precio) || 15000) 
     : 0;
+
+  const subtotal = priceValue * (parseInt(formData.quantity) || 1);
   const iva = subtotal * IVA_RATE;
   const totalAmount = subtotal + iva;
 
@@ -114,12 +156,19 @@ const OrderView = () => {
   const handleSubmitOrder = async (e) => {
     e.preventDefault();
 
-    if (!formData.productId || formData.quantity < 1) {
-      setError("Por favor, selecciona un producto y una cantidad válida.");
+    const currentQuantity = parseInt(formData.quantity);
+    if (!formData.productId || isNaN(currentQuantity) || currentQuantity < 1) {
+      setError("Por favor, selecciona un producto y una cantidad válida");
       return;
     }
-    if (!selectedProduct) {
-      setError("Producto no encontrado.");
+
+    if (
+      !formData.customerName.trim() ||
+      !formData.customerRut.trim() ||
+      !formData.customerEmail.trim() ||
+      !formData.shippingAddress.trim()
+    ) {
+      setError("Por favor, completa todos los datos del cliente");
       return;
     }
 
@@ -132,15 +181,21 @@ const OrderView = () => {
       items: [
         {
           productId: parseInt(formData.productId),
-          quantity: parseInt(formData.quantity),
+          quantity: currentQuantity,
         },
       ],
     };
 
     try {
-      setLoading(true);
+      setSaving(true);
       setError(null);
-      await axiosInstance.post("/orders", newOrder);
+      const response = await fetch(`${API_BASE}/orders`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(newOrder),
+      });
+      await handleFetchResponse(response, "Error al registrar el pedido");
+
       setFormData({
         productId: "",
         quantity: 1,
@@ -152,36 +207,37 @@ const OrderView = () => {
       setShowForm(false);
       await fetchData();
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Error al registrar el pedido en el backend",
-      );
+      setError(extractErrorMsg(err, "Error al registrar el pedido"));
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       setStatusUpdateLoading(true);
-      await axiosInstance.patch(`/orders/${orderId}/status`, {
-        status: newStatus,
+      const patchResponse = await fetch(`${API_BASE}/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: newStatus }),
       });
+      await handleFetchResponse(patchResponse, "Error al actualizar el estado");
+
+      setIsModalOpen(false);
 
       const [ordersRes, productsRes] = await Promise.all([
-        axiosInstance.get("/orders"),
-        axiosInstance.get("/products"),
+        fetch(`${API_BASE}/orders`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE}/products`, { headers: getAuthHeaders() }),
       ]);
-      setOrders(ordersRes.data);
-      setProducts(productsRes.data);
+      const ordersData = await handleFetchResponse(ordersRes, "Error al obtener los pedidos");
+      const productsData = await handleFetchResponse(productsRes, "Error al obtener el inventario");
 
-      const updatedOrder = ordersRes.data.find((o) => o.id === orderId);
-      if (updatedOrder) setSelectedOrder(updatedOrder);
+      const ordersArr = Array.isArray(ordersData) ? ordersData : [];
+      setOrders(ordersArr);
+      setProducts(Array.isArray(productsData) ? productsData : []);
+
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Error al actualizar el estado en el servidor",
-      );
+      setError(extractErrorMsg(err, "Error al actualizar el estado"));
     } finally {
       setStatusUpdateLoading(false);
     }
@@ -193,11 +249,9 @@ const OrderView = () => {
   };
 
   const formatCurrency = (amount) => {
-    if (amount == null) return "$0";
-    return new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency: "CLP",
-    }).format(amount);
+    if (amount == null || isNaN(amount)) return "$0";
+    const str = Math.round(amount).toString();
+    return "$" + str.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
 
   const ordersList = useMemo(() => {
@@ -210,43 +264,49 @@ const OrderView = () => {
     }
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {orders.map((order) => (
-          <div
-            key={order.id}
-            className="border border-gray-200 rounded p-4 shadow-sm hover:shadow-md transition-shadow bg-white flex flex-col"
-          >
-            <div className="flex justify-between mb-2">
-              <span className="font-heading font-semibold text-gray-800">
-                Pedido #{order.id}
-              </span>
-              <span
-                className={`text-xs px-2 py-1 rounded font-medium font-sans ${getStatusColor(order.status)}`}
-              >
-                {order.status}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 font-sans mb-1 truncate">
-              <span className="font-medium">Cliente:</span>{" "}
-              {order.customerName || "N/A"}
-            </p>
-            <p className="text-sm text-gray-600 font-sans mb-1 truncate">
-              <span className="font-medium">Destino:</span>{" "}
-              {order.shippingAddress || "N/A"}
-            </p>
-            <p className="text-sm text-gray-600 font-sans mb-3">
-              <span className="font-medium">Total:</span>{" "}
-              {formatCurrency(order.totalAmount)}
-            </p>
-            <div className="mt-auto pt-3 border-t border-gray-100">
-              <button
+        {orders.map((order) => {
+          const displayStatus = translateStatus(order.status);
+          return (
+            <div
+              key={order.id}
+              className="border border-gray-200 rounded p-4 shadow-sm hover:shadow-md transition-shadow bg-white flex flex-col"
+            >
+              <div className="flex justify-between mb-2">
+                <span className="font-heading font-semibold text-gray-800">
+                  Pedido #{order.id}
+                </span>
+                <span
+                  className={`text-xs px-2 py-1 rounded font-medium font-sans ${getStatusColor(order.status)}`}
+                >
+                  {displayStatus}
+                </span>
+              </div>
+              <p 
+                className="text-sm text-gray-600 font-sans mb-1 truncate cursor-pointer hover:underline"
                 onClick={() => openDetailsModal(order)}
-                className="w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
               >
-                Ver Detalles / Gestionar Estado
-              </button>
+                <span className="font-medium">Cliente:</span>{" "}
+                {order.customerName || "N/A"}
+              </p>
+              <p className="text-sm text-gray-600 font-sans mb-1 truncate">
+                <span className="font-medium">Destino:</span>{" "}
+                {order.shippingAddress || "N/A"}
+              </p>
+              <p className="text-sm text-gray-600 font-sans mb-3">
+                <span className="font-medium">Total:</span>{" "}
+                {formatCurrency(order.totalAmount)}
+              </p>
+              <div className="mt-auto pt-3 border-t border-gray-100">
+                <button
+                  onClick={() => openDetailsModal(order)}
+                  className="w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                >
+                  Ver Detalles
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }, [orders]);
@@ -257,7 +317,7 @@ const OrderView = () => {
         <h1 className="text-2xl font-heading font-bold text-gray-800">
           Gestión de Pedidos
         </h1>
-        <Button onClick={() => setShowForm(!showForm)} disabled={loading}>
+        <Button onClick={() => setShowForm(!showForm)} disabled={loading || saving}>
           {showForm ? "Cancelar" : "Nuevo Pedido"}
         </Button>
       </div>
@@ -270,13 +330,17 @@ const OrderView = () => {
 
       {showForm && (
         <Card title="Crear Nuevo Pedido Logístico">
-          <form onSubmit={handleSubmitOrder} className="space-y-4">
+          <form onSubmit={handleSubmitOrder} className="space-y-4" noValidate>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-100 pb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                <label
+                  htmlFor="customerName"
+                  className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                >
                   Nombre del Cliente
                 </label>
                 <input
+                  id="customerName"
                   type="text"
                   name="customerName"
                   value={formData.customerName}
@@ -287,10 +351,14 @@ const OrderView = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
-                  RUT del Cliente
+                <label
+                  htmlFor="customerRut"
+                  className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                >
+                  RUT
                 </label>
                 <input
+                  id="customerRut"
                   type="text"
                   name="customerRut"
                   value={formData.customerRut}
@@ -301,10 +369,14 @@ const OrderView = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                <label
+                  htmlFor="customerEmail"
+                  className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                >
                   Correo Electrónico
                 </label>
                 <input
+                  id="customerEmail"
                   type="email"
                   name="customerEmail"
                   value={formData.customerEmail}
@@ -315,10 +387,14 @@ const OrderView = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
-                  Dirección de Despacho
+                <label
+                  htmlFor="shippingAddress"
+                  className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                >
+                  Dirección de Envío
                 </label>
                 <input
+                  id="shippingAddress"
                   type="text"
                   name="shippingAddress"
                   value={formData.shippingAddress}
@@ -332,10 +408,14 @@ const OrderView = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
-                  Seleccionar Producto
+                <label
+                  htmlFor="productId"
+                  className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                >
+                  Producto
                 </label>
                 <select
+                  id="productId"
                   name="productId"
                   value={formData.productId}
                   onChange={handleInputChange}
@@ -345,24 +425,26 @@ const OrderView = () => {
                   <option value="" disabled>
                     -- Elige un producto --
                   </option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} —{" "}
-                      {new Intl.NumberFormat("es-CL", {
-                        style: "currency",
-                        currency: "CLP",
-                        maximumFractionDigits: 0,
-                      }).format(p.price)}{" "}
-                      (Stock: {p.availableQuantity})
-                    </option>
-                  ))}
+                  {products.map((p) => {
+                    const dispPrice = parseFloat(p.price) || parseFloat(p.precio) || 15000;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {p.name} — {formatCurrency(dispPrice)} (Stock:{" "}
+                        {p.availableQuantity !== undefined ? p.availableQuantity : 0})
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+                <label
+                  htmlFor="quantity"
+                  className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+                >
                   Cantidad
                 </label>
                 <input
+                  id="quantity"
                   type="number"
                   name="quantity"
                   min="1"
@@ -374,13 +456,12 @@ const OrderView = () => {
               </div>
             </div>
 
-            {/* Resumen de precio en tiempo real */}
             {selectedProduct && (
               <div className="bg-gray-50 border border-gray-200 rounded p-3 text-sm font-sans space-y-1">
                 <div className="flex justify-between text-gray-600">
                   <span>
                     Subtotal ({formData.quantity} ×{" "}
-                    {formatCurrency(selectedProduct.price)}):
+                    {formatCurrency(priceValue)}):
                   </span>
                   <span>{formatCurrency(subtotal)}</span>
                 </div>
@@ -396,8 +477,8 @@ const OrderView = () => {
             )}
 
             <div className="pt-2 flex justify-end">
-              <Button type="submit" disabled={loading || !formData.productId}>
-                {loading ? "Procesando..." : "Confirmar Pedido"}
+              <Button type="submit" disabled={saving}>
+                {saving ? "Procesando..." : "Registrar Pedido"}
               </Button>
             </div>
           </form>
@@ -419,7 +500,7 @@ const OrderView = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b p-4">
               <h3 className="text-lg font-heading font-bold text-gray-800">
-                Detalles del Pedido #{selectedOrder.id}
+                Detalles del Pedido
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -449,17 +530,7 @@ const OrderView = () => {
                 <div className="flex items-center gap-3">
                   <select
                     className="p-2 border border-gray-300 rounded w-full text-sm font-sans focus:ring-blue-500 outline-none disabled:bg-gray-100"
-                    value={
-                      selectedOrder.status === "Confirmado"
-                        ? "CONFIRMED"
-                        : selectedOrder.status === "Pendiente"
-                          ? "PENDING"
-                          : selectedOrder.status === "Enviado"
-                            ? "SHIPPED"
-                            : selectedOrder.status === "Entregado"
-                              ? "DELIVERED"
-                              : "CANCELLED_NO_STOCK"
-                    }
+                    value={toApiStatus(selectedOrder.status) || selectedOrder.status}
                     onChange={(e) =>
                       handleStatusChange(selectedOrder.id, e.target.value)
                     }
@@ -510,8 +581,9 @@ const OrderView = () => {
                     {selectedOrder.items && selectedOrder.items.length > 0 ? (
                       selectedOrder.items.map((item, idx) => {
                         const prod = products.find(
-                          (p) => p.id === item.productId,
+                          (p) => String(p.id) === String(item.productId),
                         );
+                        const prodPrice = prod ? (parseFloat(prod.price) || parseFloat(prod.precio) || 15000) : 0;
                         return (
                           <li key={idx} className="py-2 flex justify-between">
                             <span>
@@ -522,11 +594,9 @@ const OrderView = () => {
                                 x{item.quantity}
                               </span>
                             </span>
-                            {prod && (
-                              <span className="text-gray-600">
-                                {formatCurrency(prod.price * item.quantity)}
-                              </span>
-                            )}
+                            <span className="text-gray-600">
+                              {formatCurrency(prodPrice * item.quantity)}
+                            </span>
                           </li>
                         );
                       })

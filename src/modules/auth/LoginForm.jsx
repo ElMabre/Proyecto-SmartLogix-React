@@ -2,6 +2,8 @@ import React, { useState, useCallback } from "react";
 import Card from "../../shared/components/Card";
 import Button from "../../shared/components/Button";
 
+const API_BASE = import.meta.env.VITE_API_GATEWAY_URL || "http://localhost:8080";
+
 const LoginForm = ({ onLogin }) => {
   const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -16,10 +18,16 @@ const LoginForm = ({ onLogin }) => {
     async (e) => {
       e.preventDefault();
       setError("");
+
+      if (!credentials.email.trim() || !credentials.password.trim()) {
+        setError("Por favor, ingresa tu correo y contraseña.");
+        return;
+      }
+
       setLoading(true);
 
       try {
-        const response = await fetch("http://localhost:8080/auth/login", {
+        const response = await fetch(`${API_BASE}/auth/login`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -27,12 +35,23 @@ const LoginForm = ({ onLogin }) => {
           body: JSON.stringify(credentials),
         });
 
-        if (!response.ok) {
-          throw new Error(
-            "Credenciales inválidas o error de conexión con SmartLogix.",
-          );
+        const isOk = response.ok === undefined ? true : response.ok;
+        let userData;
+
+        if (typeof response.json === "function") {
+          try {
+            userData = await response.json();
+          } catch (err) {
+            if (isOk) throw new Error("JSON malformado");
+            userData = {};
+          }
+        } else {
+          userData = response.data !== undefined ? response.data : response;
         }
-        const userData = await response.json();
+
+        if (!isOk || userData?.error) {
+          throw new Error(userData?.message || `Error ${response.status || 500}`);
+        }
 
         if (userData && userData.token) {
           localStorage.setItem("smartlogix_jwt", userData.token);
@@ -42,7 +61,28 @@ const LoginForm = ({ onLogin }) => {
         }
         onLogin(userData);
       } catch (err) {
-        setError(err.message || "Error al conectar con el servidor.");
+        let msg = err.message || "";
+        const msgLower = msg.toLowerCase();
+        
+        if (msg === "JSON malformado") {
+          setError("Error al conectar con el servidor");
+          return;
+        }
+
+        const isGeneric =
+          msgLower.includes("timeout") ||
+          msgLower.includes("network") ||
+          msgLower.includes("abort") ||
+          msgLower.includes("failed to fetch") ||
+          err.name === "TypeError" ||
+          err.name === "SyntaxError" ||
+          msg.includes("is not a function");
+
+        if (isGeneric) {
+          setError("Error al conectar con el servidor");
+        } else {
+          setError("Credenciales inválidas o error de conexión con SmartLogix.");
+        }
       } finally {
         setLoading(false);
       }
@@ -54,17 +94,21 @@ const LoginForm = ({ onLogin }) => {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       <div className="w-full max-w-md">
         <Card title="Ingreso a SmartLogix">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             {error && (
               <div className="p-3 bg-red-100 text-red-700 rounded text-sm font-sans">
                 {error}
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+              >
                 Correo Electrónico
               </label>
               <input
+                id="email"
                 type="email"
                 name="email"
                 value={credentials.email}
@@ -74,10 +118,14 @@ const LoginForm = ({ onLogin }) => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 font-sans">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 mb-1 font-sans"
+              >
                 Contraseña
               </label>
               <input
+                id="password"
                 type="password"
                 name="password"
                 value={credentials.password}
