@@ -1,77 +1,97 @@
-# SmartLogix - Frontend
+# Frontend - SmartLogix
 
-SmartLogix Frontend es la interfaz de usuario para la plataforma de gestión logística. Esta aplicación web de una sola página (SPA) está construida para interactuar con los microservicios del backend, ofreciendo paneles de control para la gestión de inventario, pedidos y autenticación de usuarios.
+![React](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-1.4-729B1B?style=for-the-badge&logo=vitest&logoColor=white)
 
----
+## Descripción General
 
-## Tecnologías principales
+Este proyecto representa el cliente web y la única cara visible para los usuarios de SmartLogix. Está construido como una Single Page Application (SPA) moderna y rápida. Su función en el sistema es brindar la experiencia de usuario y comercio electrónico, consumiendo de forma centralizada toda la lógica de negocio del backend.
 
-- **React** — Biblioteca principal para la construcción de interfaces de usuario.
-- **Vite** — Entorno de desarrollo y empaquetador optimizado.
-- **Tailwind CSS** — Framework de utilidades CSS para diseño ágil y responsivo.
-- **PostCSS** — Procesador de estilos para transformar y compilar Tailwind.
-- **Mock API / Storage** — Sistema interno (`useMockApi`, `mockDatabase`) para desarrollo y pruebas sin depender del backend en etapas tempranas.
+Dado el enfoque Multi-Tenant de la arquitectura, este frontend se encarga de gestionar el contexto de la tienda actual, inyectando los identificadores de la PYME y tokens de seguridad en cada petición hacia el ecosistema.
 
----
+> El frontend no se comunica directamente con ningún microservicio por motivos de seguridad y diseño arquitectónico. Todas las peticiones pasan por el API Gateway.
 
-## Estructura del proyecto
+## Integración con la Arquitectura
 
-    src/
-    ├── core/               # Lógica central de la aplicación
-    │   ├── hooks/          # Hooks personalizados (ej. useMockApi)
-    │   ├── services/       # Integración con APIs (ej. authService)
-    │   └── storage/        # Configuración de persistencia local o mocks
-    ├── modules/            # Módulos de negocio (vistas y lógica específica)
-    │   ├── auth/           # Autenticación y login (LoginForm)
-    │   ├── inventory/      # Gestión de inventario (InventoryView)
-    │   └── orders/         # Gestión de pedidos (OrderView)
-    ├── shared/             # Recursos compartidos en toda la aplicación
-    │   ├── components/     # Componentes UI reutilizables (Button, Card, etc.)
-    │   └── layouts/        # Estructuras de página (DashboardLayout)
-    ├── App.jsx             # Componente raíz y enrutamiento principal
-    └── main.jsx            # Punto de entrada de la aplicación
+```text
+[ SmartLogix Frontend / React ]
+              |
+              |  Peticiones HTTP (Axios)
+              |
+              |  Headers Inyectados:
+              |   - Authorization: Bearer <TOKEN>
+              |   - pyme_id: <ID_PYME>
+              v
+     +-----------------+
+     |   API Gateway   |  (http://localhost:8080)
+     +-----------------+
+              |
+  +-------+---+---+-------+-------+
+  |       |       |       |       |
+  v       v       v       v       v
+[Auth] [Users] [Orders] [Inv.]  [Notif]
+```
 
----
+## Stack Tecnológico
 
-## Requisitos previos
+| Tecnología / Librería | Propósito principal |
+|---|---|
+| React (v19) | Biblioteca core para la construcción de componentes y la UI |
+| Vite (v8) | Entorno de desarrollo ultrarrápido y empaquetador para producción |
+| Tailwind CSS (v3) | Framework de utilidades CSS para diseño responsivo y ágil |
+| Axios | Cliente HTTP principal para orquestar la comunicación con el API Gateway |
+| Vitest / React Testing Library | Frameworks utilizados para las pruebas unitarias y de componentes (DOM) |
+| ESLint | Linter configurado para mantener estándares de calidad y formato en el código |
 
-- Node.js 16 o superior
-- NPM o Yarn como gestor de paquetes
+## Requisitos Previos
 
----
+Para levantar este servicio en un entorno de desarrollo local, requieres:
 
-## Despliegue local
+- Node.js (versión 18.x o superior recomendada)
+- npm, yarn o pnpm como gestor de paquetes
+- El servicio API Gateway de SmartLogix en ejecución
 
-### 1. Clonar el repositorio
+## Variables de Entorno
 
-    git clone <url-del-repositorio>
-    cd Proyecto-SmartLogix-React
+Debes crear un archivo `.env` en el directorio raíz del frontend basándote en la siguiente configuración:
 
-### 2. Instalar dependencias
+| Variable | Descripción | Valor local recomendado |
+|---|---|---|
+| `VITE_API_GATEWAY_URL` | URL de entrada principal hacia la red de microservicios | `http://localhost:8080` |
 
-    npm install
+## Instrucciones de Ejecución
 
-### 3. Configurar variables de entorno
+### Modo Desarrollo Local
 
-Copia el archivo `.env.example` o edita directamente el `.env` para configurar la URL del API Gateway:
+Instala las dependencias del proyecto:
 
-    VITE_API_URL=http://localhost:8080
+```bash
+npm install
+```
 
-### 4. Levantar el servidor de desarrollo
+Inicia el servidor de desarrollo con Hot-Module Replacement (HMR):
 
-    npm run dev
+```bash
+npm run dev
+```
 
-La aplicación estará disponible en http://localhost:5173.
+El proyecto estará disponible por defecto en `http://localhost:5173`.
 
-### 5. Construcción para producción
+## Pruebas y Cobertura
 
-    npm run build
+El proyecto está configurado con Vitest para garantizar la resiliencia del frontend.
 
-Esto generará una carpeta `dist/` con los archivos estáticos optimizados.
+Para correr la suite de pruebas unitarias:
 
----
+```bash
+npm run test
+```
 
-## Patrones de diseño
+Para generar un reporte completo de la cobertura de código:
 
-- **Modularidad por dominio** — Agrupación de vistas y componentes por contexto de negocio (Auth, Orders, Inventory) en lugar de por tipo de archivo, facilitando la escalabilidad del proyecto.
-- **Componentes presentacionales vs contenedores** — Separación entre componentes UI (`shared/components`) y vistas conectadas a la lógica de negocio (`modules/`).
+```bash
+npm run test:coverage
+```
